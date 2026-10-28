@@ -1,0 +1,27 @@
+{
+  "firstName": "Ana María",
+  "lastName": "Pérez Gómez",
+  "documentType": "CC",
+  "document": "1065123456",
+  "birthDate": "1990-05-14",
+  "gender": "Femenino",
+  "phone": { "country": "CO", "number": "3001234567" },
+  "email": "ana@example.com",
+  "city": "Valledupar",
+  "eps": { "entity": "Nueva EPS", "other": null },
+  "emergencyContact": {
+    "name": "Luis Pérez",
+    "phone": { "country": "CO", "number": "3157654321" },
+    "relationship": "Hermano o hermana"
+  },
+  "health": { "illness": null, "allergies": "Penicilina", "disability": null, "exercises": true },
+  "commitments": { "protectedAreas": true, "environment": true },
+  "consent": { "version": "TYC-2026-10-28", "acceptedAt": "2026-10-27T01:02:03.004Z", "imageUse": true },
+  "stay": "Páramo",
+  "shirtSize": "M",
+  "companion": null,
+  "extras": [],
+  "preEventHotel": null,
+  "plan": "total",
+  "commitmentDate": null
+}

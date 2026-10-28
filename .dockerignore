@@ -1,0 +1,16 @@
+target/
+.git/
+.gitignore
+.gitattributes
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+*.iml
+*.log
+HELP.md
+backups/

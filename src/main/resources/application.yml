@@ -1,0 +1,130 @@
+spring:
+  application:
+    name: trekking-manaure-api
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  jackson:
+    deserialization:
+      accept-float-as-int: false
+  data:
+    web:
+      pageable:
+        default-page-size: 20
+        max-page-size: 100
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Bogota
+      jakarta:
+        persistence:
+          lock:
+            timeout: 5000
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    fail-on-missing-locations: false
+
+app:
+  seguridad:
+    jwt-secret: ${JWT_SECRET}
+    access-minutos: 15
+    # [SUPUESTO] 8 h sin "recordar", 7 días con él.
+    sesion-horas: 8
+    sesion-recordada-dias: 7
+    # [SUPUESTO] 5 fallos consecutivos bloquean 15 minutos.
+    max-intentos: 5
+    bloqueo-minutos: 15
+    # [SUPUESTO] Tope global de fallos por cuenta en la ventana de bloqueo, sumando todas las IP: solo audita BLOQUEO_CUENTA, no rechaza.
+    tope-global-fallos: 50
+    # [SUPUESTO] Ventana de gracia del refresh (s) para la carrera legítima de una pestaña: 0 = estricto (diseño §10.1).
+    refresh-gracia-segundos: ${REFRESH_GRACIA_SEGUNDOS:0}
+    limpieza:
+      # Borra a diario los refresh vencidos hace más de 30 días.
+      activa: ${LIMPIEZA_SESIONES_ACTIVA:true}
+      cron: "0 30 3 * * *"
+  cors:
+    origin: ${CORS_ORIGIN}
+  limites:
+    # Tope del cuerpo de cualquier solicitud (413 por encima). 64 KB.
+    max-cuerpo-bytes: 65536
+  rate-limit:
+    registro-por-minuto: 10
+    login-por-15-minutos: 20
+    refresh-por-minuto: 60
+    # H4: tope de solicitudes a POST /reservas por IP en una ventana fija de 24 h (cuenta también las inválidas).
+    # Al pasarlo: 429 con Retry-After y una alerta (log WARN + auditoría ALERTA_RESERVAS_IP) por IP y ventana.
+    reservas-por-ip-por-dia: ${RESERVAS_POR_IP_POR_DIA:20}
+  reservas:
+    caducidad:
+      # H4: una reserva sin pago aprobado cuyo pago lleva estas horas en "Por revisar" pasa a Rechazada.
+      activa: ${CADUCIDAD_RESERVAS_ACTIVA:true}
+      horas: ${CADUCIDAD_RESERVAS_HORAS:12}
+      # Cada 10 minutos (zona America/Bogota).
+      cron: "0 */10 * * * *"
+      # Reservas candidatas leídas por lote; cada una se procesa en su propia transacción.
+      lote: 50
+  admin:
+    correo: ${ADMIN_EMAIL:}
+    clave: ${ADMIN_PASSWORD:}
+  cifrado:
+    # Obligatoria: "version:base64 de 32 bytes". Sin ella (o inválida) la app no arranca.
+    salud-clave: ${HEALTH_ENCRYPTION_KEY}
+    # Opcional: claves previas "version:base64" separadas por coma, solo para descifrar.
+    salud-claves-anteriores: ${HEALTH_ENCRYPTION_KEY_ANTERIORES:}
+  cookie:
+    secure: ${COOKIE_SECURE:true}
+
+logging:
+  level:
+    # Hibernate registra el mensaje de PostgreSQL ("Key (documento_activo)=(...)") con datos personales (RN-19).
+    org.hibernate.orm.jdbc.error: "OFF"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+---
+# Perfil de producción: sin documentación de API, sin detalles internos en errores, logs mínimos.
+spring:
+  config:
+    activate:
+      on-profile: prod
+  jpa:
+    show-sql: false
+  mvc:
+    log-request-details: false
+
+server:
+  forward-headers-strategy: native
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: never
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    org.hibernate: WARN
+    org.hibernate.SQL: WARN
+    org.springframework.web: INFO
+    org.springframework.security: WARN

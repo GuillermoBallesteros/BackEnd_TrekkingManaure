@@ -1,0 +1,22 @@
+# El dominio llega por la variable de entorno DOMAIN. Caddy obtiene el certificado
+# y redirige HTTP -> HTTPS automáticamente.
+# Este Caddyfile solo lo usa docker-compose.prod.yml, por eso el HSTS vive aquí y no en la API.
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Tope del cuerpo de las solicitudes (la API aplica el mismo 64 KB y responde 413).
+	request_body {
+		max_size 64KB
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+		-Server
+	}
+
+	reverse_proxy api:8080
+}

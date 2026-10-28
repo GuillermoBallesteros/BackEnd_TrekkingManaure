@@ -1,0 +1,26 @@
+# Valores de prueba (solo en src/test). No son credenciales reales.
+app:
+  seguridad:
+    jwt-secret: clave-jwt-solo-para-pruebas-0123456789
+    limpieza:
+      # Apagada en las pruebas que no la usan; las que la necesitan la activan por propiedad.
+      activa: false
+  cors:
+    origin: http://localhost:5173
+  rate-limit:
+    registro-por-minuto: 1000000
+    login-por-15-minutos: 1000000
+    refresh-por-minuto: 1000000
+    # Alto para no afectar otras pruebas; las del tope lo bajan por propiedad.
+    reservas-por-ip-por-dia: 1000000
+  reservas:
+    caducidad:
+      # Apagada en las pruebas; la propia prueba de caducidad la activa.
+      activa: false
+  admin:
+    correo: admin-prueba@ejemplo.com
+    clave: clave-admin-prueba-1
+  cifrado:
+    # Clave de prueba (32 bytes ASCII en base64), versión 1.
+    salud-clave: "1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+    salud-claves-anteriores: ""

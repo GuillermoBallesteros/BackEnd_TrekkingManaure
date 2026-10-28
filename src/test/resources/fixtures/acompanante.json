@@ -1,0 +1,23 @@
+{
+  "firstName": "Carlos",
+  "lastName": "Rojas Díaz",
+  "documentType": "CC",
+  "document": "1065999888",
+  "birthDate": "1992-03-01",
+  "gender": "Masculino",
+  "phone": { "country": "CO", "number": "3109998877" },
+  "email": "carlos@example.com",
+  "city": "Bogotá",
+  "eps": { "entity": "EPS Sura", "other": null },
+  "emergencyContact": {
+    "name": "Marta Rojas",
+    "phone": { "country": "CO", "number": "3201112233" },
+    "relationship": "Madre"
+  },
+  "health": { "illness": "Asma leve", "allergies": null, "disability": null, "exercises": false },
+  "commitments": { "protectedAreas": true, "environment": true },
+  "consent": { "version": "TYC-2026-10-28", "acceptedAt": "2026-10-27T01:02:04.005Z", "imageUse": false },
+  "stay": "Páramo",
+  "kit": false,
+  "shirtSize": null
+}

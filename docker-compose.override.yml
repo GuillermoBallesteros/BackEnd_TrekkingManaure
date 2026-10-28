@@ -1,0 +1,5 @@
+# Solo desarrollo: expone la base en el equipo, únicamente en loopback.
+services:
+  db:
+    ports:
+      - "127.0.0.1:5433:5432"
