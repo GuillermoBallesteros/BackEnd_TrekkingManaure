@@ -132,8 +132,8 @@ class ReservaPublicaCreacionTest extends ReservaPublicaBase {
 	void respuestaConLaFormaDelTipoRegistration() throws Exception {
 		enviar(ReservaJson.titular().set("eps", Map.of("entity", "Otra", "other", "Salud Vida")))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.firstName").value("Ana María"))
-				.andExpect(jsonPath("$.lastName").value("Pérez Gómez"))
+				.andExpect(jsonPath("$.firstName").value("ANA MARIA"))
+				.andExpect(jsonPath("$.lastName").value("PEREZ GOMEZ"))
 				.andExpect(jsonPath("$.documentType").value("CC"))
 				.andExpect(jsonPath("$.document").value("1065123456"))
 				.andExpect(jsonPath("$.birthDate").value("1990-05-14"))
@@ -144,7 +144,7 @@ class ReservaPublicaCreacionTest extends ReservaPublicaBase {
 				.andExpect(jsonPath("$.city").value("Valledupar"))
 				.andExpect(jsonPath("$.eps.entity").value("Otra"))
 				.andExpect(jsonPath("$.eps.other").value("Salud Vida"))
-				.andExpect(jsonPath("$.emergencyContact.name").value("Luis Pérez"))
+				.andExpect(jsonPath("$.emergencyContact.name").value("LUIS PEREZ"))
 				.andExpect(jsonPath("$.emergencyContact.phone.country").value("CO"))
 				.andExpect(jsonPath("$.emergencyContact.phone.number").value("3157654321"))
 				.andExpect(jsonPath("$.emergencyContact.relationship").value("Hermano o hermana"))
@@ -170,7 +170,7 @@ class ReservaPublicaCreacionTest extends ReservaPublicaBase {
 	void respuestaDelAcompananteConSaludYKit() throws Exception {
 		enviar(ReservaJson.conAcompanante().set("companion.kit", true).set("companion.shirtSize", "L"))
 				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.companion.firstName").value("Carlos"))
+				.andExpect(jsonPath("$.companion.firstName").value("CARLOS"))
 				.andExpect(jsonPath("$.companion.health.illness").value("Asma leve"))
 				.andExpect(jsonPath("$.companion.health.exercises").value(false))
 				.andExpect(jsonPath("$.companion.kit").value(true))

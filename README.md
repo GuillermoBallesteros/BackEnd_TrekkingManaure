@@ -39,8 +39,11 @@ Tope diario por IP (H4): además, `POST /api/v1/reservas` admite 20 solicitudes 
 
 Caducidad de reservas sin pago (H4): una tarea programada (`app.reservas.caducidad.cron`, cada 10 minutos) rechaza el pago "Por revisar" de las reservas sin pagos aprobados cuando lleva `app.reservas.caducidad.horas` (12) o más en revisión, con el motivo "No se verificó el pago dentro de 12 horas." y libera el documento. Se activa con `CADUCIDAD_RESERVAS_ACTIVA` (por defecto `true`; `CADUCIDAD_RESERVAS_HORAS` cambia el plazo). La migración V17 añade `pago.en_revision_desde` (rellenada con la fecha de creación: al desplegar, los pagos pendientes de más de 12 horas se rechazarán en la primera ejecución).
 
-## Estado de la API
-Tras la HU-N01 el esquema nuevo (V9 a V15), los catálogos, la configuración del evento y el cifrado de salud están listos, pero la API pública queda mínima: solo `POST /api/v1/auth/login` (adaptado a la tabla `administrador`, correo en minúsculas) y `GET /actuator/health`. El registro de reservas, la disponibilidad, la configuración pública y el panel de administración llegan con las historias HU-N03 a HU-N12. Las tablas anteriores se eliminaron en la V9: los datos locales de desarrollo se pierden.
+## API
+Rutas públicas: `POST /api/v1/reservas`, `GET /api/v1/config`, `GET /api/v1/disponibilidad`, `POST /api/v1/auth/login|refresh|logout` y `GET /actuator/health`. Rutas de administración (JWT) bajo `/api/v1/admin/`: reservas, revisión de pagos, pago manual, autorización de menores, cupos y fecha de cierre. En desarrollo la documentación OpenAPI está en `/swagger-ui.html`; en `prod` está desactivada.
+
+## Avisos por correo (Brevo)
+Al aprobar o rechazar un pago la API envía un correo transaccional con una plantilla de Brevo, y una tarea diaria (12:00, Bogotá) envía los recordatorios de saldo y de víspera del evento. Está apagado por defecto: con `BREVO_ACTIVO=true` la API exige `BREVO_API_KEY` y no arranca sin ella. Variables (ver `.env.example`): `BREVO_API_KEY`, `BREVO_REMITENTE_CORREO` (remitente verificado en Brevo), `BREVO_REMITENTE_NOMBRE` y el id de plantilla de cada aviso en `BREVO_PLANTILLA_*` (0 apaga ese aviso). Cada aviso se registra en `envio_aviso` y no se envía dos veces.
 
 ## Arrancar
 ```powershell
@@ -90,7 +93,7 @@ En producción se usa `docker-compose.prod.yml` junto al base y **sin** `docker-
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml <comando>
 ```
-Resultado: Caddy (`caddy:2.10.2`) es lo único que publica puertos (80 y 443) y obtiene el certificado HTTPS solo; `api` y `db` solo se ven dentro de la red interna de Docker. Perfil `prod`: sin Swagger/OpenAPI, errores sin detalles internos, logs en INFO sin SQL ni datos personales o de salud. Todos los contenedores usan `restart: unless-stopped`. Volúmenes con nombre: `db_data` (datos), `caddy_data` y `caddy_config` (certificados).
+Resultado: Caddy (`caddy:2.10.2`) es lo único que publica puertos (80 y 443) y obtiene el certificado HTTPS solo; `web`, `api` y `db` solo se ven dentro de la red interna de Docker. Un solo origen: Caddy envía `/api/*` y `/actuator/health` a la API y el resto al sitio y al panel (servicio `web`, nginx), que se construye desde el repositorio del front clonado al lado (`FRONT_DIR`, por defecto `../../TrekkingManaure`) con `VITE_API_URL=https://<DOMAIN>`. `www.<DOMAIN>` redirige al dominio principal. Perfil `prod`: sin Swagger/OpenAPI, errores sin detalles internos, logs en INFO sin SQL ni datos personales o de salud. Todos los contenedores usan `restart: unless-stopped`. Volúmenes con nombre: `db_data` (datos), `caddy_data` y `caddy_config` (certificados).
 
 ### Antes de empezar
 - El dominio (registro DNS tipo A/AAAA) **debe apuntar a la IP del VPS antes del primer arranque**: Caddy necesita validarlo para emitir el certificado. Los puertos 80 y 443 deben estar libres y accesibles desde Internet.
@@ -110,8 +113,14 @@ Nota: Docker publica puertos saltándose ufw; por eso el compose de producción 
 
 ### Pasos en el VPS
 1. Instalar Docker Engine y el plugin Compose (guía oficial: https://docs.docker.com/engine/install/).
-2. Clonar el proyecto y entrar a su carpeta (`git clone <url> && cd BackEnd_TrekkingManaure`).
-3. Crear el `.env` de producción: `cp .env.example .env` y editarlo (`chmod 600 .env`). Obligatorias en prod: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ORIGIN` (origen HTTPS del front), `JWT_SECRET`, `HEALTH_ENCRYPTION_KEY` y `DOMAIN`. Secretos fuertes:
+2. Clonar los dos repositorios lado a lado y entrar al del backend:
+   ```bash
+   sudo mkdir -p /opt/trekking && sudo chown "$USER" /opt/trekking && cd /opt/trekking
+   git clone <url-del-front> TrekkingManaure
+   git clone <url-del-backend> Trekkingbackend/BackEnd_TrekkingManaure
+   cd Trekkingbackend/BackEnd_TrekkingManaure
+   ```
+3. Crear el `.env` de producción: `cp .env.example .env` y editarlo (`chmod 600 .env`). Obligatorias en prod: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `CORS_ORIGIN=https://<DOMAIN>`, `COOKIE_SECURE=true`, `JWT_SECRET`, `HEALTH_ENCRYPTION_KEY` y `DOMAIN`; para los correos, `BREVO_ACTIVO=true`, `BREVO_API_KEY` y `BREVO_PLANTILLA_*`. Secretos fuertes:
    ```bash
    openssl rand -hex 32      # DB_PASSWORD
    openssl rand -base64 18   # ADMIN_PASSWORD (mínimo 12 caracteres en prod)
@@ -124,9 +133,9 @@ Nota: Docker publica puertos saltándose ufw; por eso el compose de producción 
    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
    ```
 5. Ver logs: `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f api` (también `caddy`, `db`).
-6. Actualizar de versión:
+6. Actualizar de versión (los dos repositorios):
    ```bash
-   git pull
+   git -C ../../TrekkingManaure pull && git pull
    docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
    ```
    Nunca use `down -v` en producción: borra la base.
@@ -134,7 +143,8 @@ Nota: Docker publica puertos saltándose ufw; por eso el compose de producción 
 ### Verificación
 - `curl https://{dominio}/actuator/health` responde `{"status":"UP",...}`.
 - `curl -I http://{dominio}` responde 308 con `Location: https://{dominio}/`.
-- `https://{dominio}/swagger-ui.html` y `/v3/api-docs` no responden contenido.
+- `https://{dominio}/` sirve el sitio y `https://{dominio}/admin` el panel; `curl -I https://www.{dominio}` redirige a `https://{dominio}/`.
+- `https://{dominio}/api/v3/api-docs` responde 404 (Swagger desactivado en `prod`; `/swagger-ui.html` lo atiende el sitio, no la API).
 - La base no responde desde Internet; desde **otra máquina**:
   ```bash
   nmap -Pn -p 22,80,443,5432,5433,8080 {dominio}   # solo 22, 80 y 443 abiertos

@@ -19,21 +19,26 @@ class ValidadorDocumentoTest {
 
 	/** Un documento válido y su edad típica por cada uno de los 6 tipos. */
 	@ParameterizedTest(name = "{0} {1} con nacimiento {2} es válido")
-	@CsvSource({ "CC,1065123456,1990-05-14", "CC,123456,2008-10-28", "CE,123456,1990-05-14",
+	@CsvSource({ "CC,1065123456,1990-05-14", "CC,54876234,1990-05-14", "CC,1098726541,1990-05-14",
+			"CC,123456789,1990-05-14", "CC,12345678,2008-10-28", "CE,123456,1990-05-14", "CE,1234567890,1990-05-14",
 			"TI,1234567890,2015-01-01", "TI,12345678901,2008-05-01", "RC,1234567890,2021-01-01",
-			"Pasaporte,AB123,1990-05-14", "Pasaporte,ab12345678901234567x,1990-05-14", "PPT,ABC12,1990-05-14",
-			"PPT,ABCDE1234567890,1990-05-14" })
+			"Pasaporte,AB1234,1990-05-14", "Pasaporte,AB1234567890,1990-05-14", "PPT,12345,1990-05-14",
+			"PPT,12345678,1990-05-14" })
 	void documentoValido(String tipo, String documento, String nacimiento) {
 		assertThat(validar(tipo, documento, nacimiento)).isEmpty();
 	}
 
 	@ParameterizedTest(name = "{0} {1} inválido: {3}")
-	@CsvSource({ "CC,12345,1990-05-14,entre 6 y 10 dígitos", "CC,12345678901,1990-05-14,entre 6 y 10 dígitos",
-			"CC,12345A,1990-05-14,entre 6 y 10 dígitos", "CE,12345,1990-05-14,entre 6 y 10 dígitos",
-			"TI,123456789,2015-01-01,10 u 11 dígitos", "RC,123456789,2021-01-01,10 dígitos",
-			"Pasaporte,AB12,1990-05-14,entre 5 y 20 letras o números",
-			"Pasaporte,AB 123,1990-05-14,entre 5 y 20 letras o números",
-			"PPT,ABCDEFGHIJKLMNOP,1990-05-14,entre 5 y 15 letras o números" })
+	@CsvSource({ "CC,12345,1990-05-14,entre 8 y 10 dígitos", "CC,1234567,1990-05-14,entre 8 y 10 dígitos",
+			"CC,12345678901,1990-05-14,entre 8 y 10 dígitos", "CC,1.098.726.541,1990-05-14,entre 8 y 10 dígitos",
+			"CC,12AB567890,1990-05-14,entre 8 y 10 dígitos", "CC,0987654321,1990-05-14,entre 8 y 10 dígitos",
+			"CC,098726541,1990-05-14,entre 8 y 10 dígitos", "CE,12345,1990-05-14,entre 6 y 10 dígitos",
+			"CE,12345678901,1990-05-14,entre 6 y 10 dígitos", "TI,123456789,2015-01-01,10 u 11 dígitos",
+			"RC,123456789,2021-01-01,10 dígitos", "Pasaporte,AB123,1990-05-14,entre 6 y 12 letras o números",
+			"Pasaporte,AB12345678901,1990-05-14,entre 6 y 12 letras o números",
+			"Pasaporte,AB 1234,1990-05-14,entre 6 y 12 letras o números",
+			"PPT,1234,1990-05-14,entre 5 y 8 dígitos", "PPT,123456789,1990-05-14,entre 5 y 8 dígitos",
+			"PPT,ABC12,1990-05-14,entre 5 y 8 dígitos" })
 	void documentoConFormatoInvalido(String tipo, String documento, String nacimiento, String ayuda) {
 		var error = validar(tipo, documento, nacimiento).orElseThrow();
 		assertThat(error.code()).isEqualTo(CodigoError.DOCUMENTO_INVALIDO);
@@ -44,7 +49,7 @@ class ValidadorDocumentoTest {
 	@Test
 	void cedulaDeCincoDigitosUsaElTextoExactoDelFront() {
 		assertThat(validar("CC", "12345", "1990-05-14").orElseThrow().detail())
-				.isEqualTo("El documento del participante no es válido: entre 6 y 10 dígitos.");
+				.isEqualTo("El documento del participante no es válido: entre 8 y 10 dígitos.");
 	}
 
 	@Test
@@ -89,7 +94,7 @@ class ValidadorDocumentoTest {
 	void elAcompananteUsaSuPrefijoYSuTexto() {
 		var persona = PB.acompanante().tipoDocumento("CC").documento("1").build();
 		var error = ValidadorDocumento.validar(persona, Quien.ACOMPANANTE, Datos.HOY, Datos.CATALOGOS).orElseThrow();
-		assertThat(error.detail()).isEqualTo("El documento del acompañante no es válido: entre 6 y 10 dígitos.");
+		assertThat(error.detail()).isEqualTo("El documento del acompañante no es válido: entre 8 y 10 dígitos.");
 		assertThat(error.campo()).isEqualTo("companion.document");
 	}
 

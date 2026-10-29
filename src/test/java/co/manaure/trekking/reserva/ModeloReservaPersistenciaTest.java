@@ -68,16 +68,16 @@ class ModeloReservaPersistenciaTest {
 
 	@Test
 	void guardaYLeeLaReservaCompleta() {
-		Persona titular = personas.save(new Persona("Maria", "Perez", "CC", "DOC12345", LocalDate.of(1990, 5, 14),
+		Persona titular = personas.save(new Persona("MARIA", "PEREZ", "CC", "12345678", LocalDate.of(1990, 5, 14),
 				"Femenino", "CO", "3001234567", "maria@example.com", "Valledupar", "Otra", "Mi EPS"));
-		contactos.save(new ContactoEmergencia(titular, "Luis Perez", "CO", "3157654321", "Hermano o hermana"));
+		contactos.save(new ContactoEmergencia(titular, "LUIS PEREZ", "CO", "3157654321", "Hermano o hermana"));
 		consentimientos.save(new ConsentimientoPersona(titular, "TYC-2026-10-28", OffsetDateTime.now(), true, true, true));
 
 		Inscripcion insc = inscripciones.save(new Inscripcion(codigos.siguienteCodigoInscripcion(), PlanPago.APARTADO,
 				LocalDate.of(2026, 11, 9), 350000, 50000, 150000, 350000, 150000, 200000, 45000, 500000,
 				LocalDate.of(2026, 10, 28)));
 		participantes.save(new InscripcionParticipante(insc, titular, RolParticipante.TITULAR, "Páramo", true, "M",
-				"DOC12345"));
+				"12345678"));
 		extras.save(new InscripcionExtra(insc.getId(), "cuatrimoto"));
 		hoteles.save(new HotelPrevio(insc, LocalDate.of(2026, 11, 12), LocalDate.of(2026, 11, 14), true));
 		Pago pago = pagos.save(Pago.publico(codigos.siguienteCodigoPago(), insc, ConceptoPago.SEPARACION_CUPO, 50000,
@@ -92,7 +92,7 @@ class ModeloReservaPersistenciaTest {
 		assertThat(leida.getCreadoEn()).isNotNull();
 		assertThat(participantes.findAll()).singleElement().satisfies(p -> {
 			assertThat(p.getRol()).isEqualTo(RolParticipante.TITULAR);
-			assertThat(p.getDocumentoActivo()).isEqualTo("DOC12345");
+			assertThat(p.getDocumentoActivo()).isEqualTo("12345678");
 		});
 		assertThat(extras.findAll()).singleElement().satisfies(e -> assertThat(e.getId().extra()).isEqualTo("cuatrimoto"));
 		assertThat(hoteles.findAll()).singleElement().satisfies(h -> assertThat(h.isConAcompanante()).isTrue());

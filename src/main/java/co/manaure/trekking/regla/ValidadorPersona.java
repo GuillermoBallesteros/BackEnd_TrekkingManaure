@@ -48,7 +48,7 @@ public final class ValidadorPersona {
 			return Optional.empty();
 		}
 		return ErrorRegla.de(CodigoError.NOMBRE_INVALIDO,
-				"Escribe nombres y apellidos " + q.de() + " solo con letras (2 a 60 caracteres).",
+				"Escribe nombres y apellidos " + q.de() + " solo con letras (2 a 40 caracteres).",
 				q.campo(nombresOk ? "lastName" : "firstName"));
 	}
 
@@ -69,7 +69,7 @@ public final class ValidadorPersona {
 
 	public static Optional<ErrorRegla> ciudad(PersonaRegla p, Quien q) {
 		String ciudad = Textos.nz(p.ciudad());
-		if (ciudad.length() < 3 || ciudad.length() > 60 || !Textos.lugarValido(ciudad)) {
+		if (!Textos.lugarValido(ciudad)) {
 			return ErrorRegla.de(CodigoError.CIUDAD_INVALIDA, "Escribe la ciudad " + q.de() + " solo con letras.",
 					q.campo("city"));
 		}
@@ -84,7 +84,7 @@ public final class ValidadorPersona {
 		String otra = p.eps().otra();
 		if (catalogos.epsPideNombre(entidad)) {
 			String nombre = Textos.nz(otra);
-			if (nombre.length() < 3 || nombre.length() > 60 || !Textos.lugarValido(nombre)) {
+			if (!Textos.epsOtraValida(nombre)) {
 				return ErrorRegla.de(CodigoError.EPS_INVALIDA, "Escribe el nombre de la EPS " + q.de() + ".",
 						q.campo("eps.other"));
 			}
@@ -97,7 +97,7 @@ public final class ValidadorPersona {
 	public static Optional<ErrorRegla> contactoEmergencia(PersonaRegla p, Quien q, CatalogoReglas catalogos) {
 		ContactoRegla contacto = p.contacto();
 		String nombre = Textos.nz(contacto.nombre());
-		if (!Textos.nombreValido(nombre, 5, 120) || nombre.split(" ").length < 2) {
+		if (!Textos.nombreValido(nombre, Textos.CONTACTO_MIN, Textos.CONTACTO_MAX) || nombre.split(" ").length < 2) {
 			return ErrorRegla.de(CodigoError.CONTACTO_EMERGENCIA_INVALIDO,
 					"Escribe nombre y apellido del contacto de emergencia " + q.de() + ".",
 					q.campo("emergencyContact.name"));

@@ -1,16 +1,16 @@
 {
-  "firstName": "Carlos",
-  "lastName": "Rojas Díaz",
+  "firstName": "CARLOS",
+  "lastName": "ROJAS DIAZ",
   "documentType": "CC",
   "document": "1065999888",
   "birthDate": "1992-03-01",
   "gender": "Masculino",
   "phone": { "country": "CO", "number": "3109998877" },
   "email": "carlos@example.com",
-  "city": "Bogotá",
+  "city": "Bogota",
   "eps": { "entity": "EPS Sura", "other": null },
   "emergencyContact": {
-    "name": "Marta Rojas",
+    "name": "MARTA ROJAS",
     "phone": { "country": "CO", "number": "3201112233" },
     "relationship": "Madre"
   },

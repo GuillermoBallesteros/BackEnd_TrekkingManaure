@@ -17,6 +17,11 @@ app:
     caducidad:
       # Apagada en las pruebas; la propia prueba de caducidad la activa.
       activa: false
+  brevo:
+    # Apagado en las pruebas; las de avisos lo encienden con un ClienteBrevo simulado.
+    activo: false
+    recuperar-al-arrancar: false
+    espera-reintento-ms: 0
   admin:
     correo: admin-prueba@ejemplo.com
     clave: clave-admin-prueba-1

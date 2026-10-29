@@ -45,12 +45,12 @@ final class Datos {
 
 	private static CatalogoReglas catalogos() {
 		Map<String, ReglaDocumento> docs = new LinkedHashMap<>();
-		docs.put("CC", new ReglaDocumento("[0-9]{6,10}", "Entre 6 y 10 dígitos", 18, null));
+		docs.put("CC", new ReglaDocumento("[1-9][0-9]{7,9}", "Entre 8 y 10 dígitos", 18, null));
 		docs.put("CE", new ReglaDocumento("[0-9]{6,10}", "Entre 6 y 10 dígitos", null, null));
 		docs.put("TI", new ReglaDocumento("[0-9]{10,11}", "10 u 11 dígitos", 7, 18));
 		docs.put("RC", new ReglaDocumento("[0-9]{10}", "10 dígitos", null, 7));
-		docs.put("Pasaporte", new ReglaDocumento("[A-Za-z0-9]{5,20}", "Entre 5 y 20 letras o números", null, null));
-		docs.put("PPT", new ReglaDocumento("[A-Za-z0-9]{5,15}", "Entre 5 y 15 letras o números", null, null));
+		docs.put("Pasaporte", new ReglaDocumento("[A-Za-z0-9]{6,12}", "Entre 6 y 12 letras o números", null, null));
+		docs.put("PPT", new ReglaDocumento("[0-9]{5,8}", "Entre 5 y 8 dígitos", null, null));
 
 		Map<String, Boolean> estadias = new LinkedHashMap<>();
 		estadias.put("Páramo", true);
@@ -66,7 +66,9 @@ final class Datos {
 		for (String e : List.of("Nueva EPS", "EPS Sura", "EPS Sanitas", "Salud Total", "Compensar", "Famisanar",
 				"Coosalud", "Mutual SER", "Cajacopi", "Asmet Salud", "Emssanar", "Savia Salud", "Capresoca",
 				"Comfenalco Valle", "Capital Salud", "Aliansalud", "Dusakawi", "Anas Wayuu", "Pijaos Salud",
-				"Mallamas", "Comfachocó", "Comfaoriente", "Régimen especial o de excepción", "No tengo EPS")) {
+				"Mallamas", "Comfachocó", "Comfaoriente", "Salud Mía", "SOS (Servicio Occidental de Salud)",
+				"EPS Familiar de Colombia", "AIC (Asociación Indígena del Cauca)", "Régimen especial o de excepción",
+				"No tengo EPS")) {
 			eps.put(e, false);
 		}
 		eps.put("Otra", true);
@@ -84,7 +86,7 @@ final class Datos {
 		Map<String, ReglaPais> paises = new LinkedHashMap<>();
 		for (ReglaPais p : List.of(
 				pais("CO", "Colombia", "57", "300 123 4567", new int[] { 10 }, new String[] { "3" },
-						new int[] { 10 }, new String[] { "60" }),
+						new int[] { 10 }, new String[] { "601", "602", "604", "605", "606", "607", "608" }),
 				pais("VE", "Venezuela", "58", "412 123 4567", new int[] { 10 }, new String[] { "41", "42" },
 						new int[] { 10 }, new String[] { "2" }),
 				pais("EC", "Ecuador", "593", "99 123 4567", new int[] { 9 }, new String[] { "9" }, new int[] { 8 },
@@ -115,19 +117,19 @@ final class Datos {
 	}
 
 	static PersonaRegla titular() {
-		return new PersonaRegla("Ana María", "Pérez Gómez", "CC", "1065123456", "1990-05-14", "Femenino",
+		return new PersonaRegla("ANA MARIA", "PEREZ GOMEZ", "CC", "1065123456", "1990-05-14", "Femenino",
 				new Telefono("CO", "3001234567"), "ana@example.com", "Valledupar",
 				new EpsElegida("Nueva EPS", null),
-				new ContactoRegla("Luis Pérez", new Telefono("CO", "3157654321"), "Hermano o hermana"),
+				new ContactoRegla("LUIS PEREZ", new Telefono("CO", "3157654321"), "Hermano o hermana"),
 				new SaludRegla(null, "Penicilina", null, true), new Compromisos(true, true),
 				new Consentimiento("2026-10-28T15:20:11.482Z", "TYC-2026-10-28", true), "Páramo");
 	}
 
 	static PersonaRegla persona() {
-		return new PersonaRegla("Carlos", "Rojas Díaz", "CC", "1065999888", "1992-03-01", "Masculino",
-				new Telefono("CO", "3109998877"), "carlos@example.com", "Bogotá",
+		return new PersonaRegla("CARLOS", "ROJAS DIAZ", "CC", "1065999888", "1992-03-01", "Masculino",
+				new Telefono("CO", "3109998877"), "carlos@example.com", "Bogota",
 				new EpsElegida("EPS Sura", null),
-				new ContactoRegla("Marta Rojas", new Telefono("CO", "3201112233"), "Madre"),
+				new ContactoRegla("MARTA ROJAS", new Telefono("CO", "3201112233"), "Madre"),
 				new SaludRegla(null, null, null, false), new Compromisos(true, true),
 				new Consentimiento("2026-10-28T15:21:00Z", "TYC-2026-10-28", false), "Páramo");
 	}

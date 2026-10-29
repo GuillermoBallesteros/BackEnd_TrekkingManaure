@@ -77,11 +77,11 @@ class PublicoControllerIntegrationTest {
 	}
 
 	private String doc() {
-		return "DOC" + SEQ.incrementAndGet();
+		return String.valueOf(70000000 + SEQ.incrementAndGet());
 	}
 
 	private Persona persona(String documento) {
-		return personas.save(new Persona("Ana", "Prueba", "CC", documento, LocalDate.of(1990, 5, 14), "Femenino", "CO",
+		return personas.save(new Persona("ANA", "PRUEBA", "CC", documento, LocalDate.of(1990, 5, 14), "Femenino", "CO",
 				"3001234567", "ana@example.com", "Valledupar", "Nueva EPS", null));
 	}
 
@@ -179,7 +179,7 @@ class PublicoControllerIntegrationTest {
 				.andExpect(content().contentTypeCompatibleWith("application/json")).andReturn().getResponse()
 				.getContentAsString();
 		for (String cuerpo : new String[] { config, disp }) {
-			assertThat(cuerpo).doesNotContain("Ana", "Prueba", "DOC", "ana@example.com", "PER-", "PAG-", "admin",
+			assertThat(cuerpo).doesNotContain("ANA", "PRUEBA", "7000", "ana@example.com", "PER-", "PAG-", "admin",
 					"correo", "documento", "actualizadoPor");
 		}
 	}

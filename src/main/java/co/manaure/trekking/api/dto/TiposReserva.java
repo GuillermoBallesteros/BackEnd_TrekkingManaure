@@ -18,6 +18,10 @@ public final class TiposReserva {
 	 * antes de cualquier regex. MAX_EXTRAS: el catálogo tiene 3 actividades extra.
 	 */
 	public static final int MAX_TEXTO = 500;
+	/** Nombres, apellidos, ciudad, EPS "Otra" y contacto: las reglas miden 40 u 80 caracteres ya normalizados. */
+	public static final int MAX_NOMBRE = 120;
+	/** Correo: la regla mide 100 caracteres ya normalizados (sin espacios). */
+	public static final int MAX_CORREO = 200;
 	public static final int MAX_CODIGO = 100;
 	public static final int MAX_EXTRAS = 3;
 
@@ -31,14 +35,14 @@ public final class TiposReserva {
 		}
 	}
 
-	public record Eps(@Size(max = MAX_CODIGO) String entity, @Size(max = MAX_TEXTO) String other) {
+	public record Eps(@Size(max = MAX_CODIGO) String entity, @Size(max = MAX_NOMBRE) String other) {
 		@Override
 		public String toString() {
 			return "Eps[***]";
 		}
 	}
 
-	public record EmergencyContact(@Size(max = MAX_TEXTO) String name, @NotNull @Valid Phone phone,
+	public record EmergencyContact(@Size(max = MAX_NOMBRE) String name, @NotNull @Valid Phone phone,
 			@Size(max = MAX_CODIGO) String relationship) {
 		@Override
 		public String toString() {

@@ -1,6 +1,6 @@
 # Proyecto: backend de inscripciones de la carrera de Manaure (Cesar, Colombia)
 
-API REST en Spring Boot para registrar participantes, calcular su costo y controlar pagos hechos por Nequi (sin pasarela). El front es un proyecto aparte: solo lectura, no lo modifiques.
+API REST en Spring Boot para registrar participantes, calcular su costo y controlar pagos hechos por llave Bre-B (sin pasarela). El front es un proyecto aparte: solo lectura, no lo modifiques.
 
 ## Documentos (léelos solo cuando la tarea los necesite)
 - docs/flujo-app.md: flujo, datos, reglas de negocio (RN-xx), precios y estados. Fuente de verdad del negocio.

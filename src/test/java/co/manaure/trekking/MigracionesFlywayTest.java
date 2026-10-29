@@ -3,6 +3,7 @@ package co.manaure.trekking;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
+import java.util.Map;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * HU-N01: las migraciones se aplican en orden V1 a V15 sobre una base nueva; V9 retira el modelo anterior
+ * HU-N01: las migraciones se aplican en orden V1 a V19 sobre una base nueva; V9 retira el modelo anterior
  * y las secuencias de códigos arrancan en 1. Usa una base aparte dentro del mismo contenedor.
  */
 @Import(TestcontainersConfiguration.class)
@@ -60,7 +61,7 @@ class MigracionesFlywayTest {
 	}
 
 	@Test
-	void flywayAplicaV9aV17SobreUnaBaseConV1aV8() {
+	void flywayAplicaV9aV18SobreUnaBaseConV1aV8() {
 		jdbcApp.execute("CREATE DATABASE " + BASE);
 		JdbcTemplate jdbc = jdbcBase();
 
@@ -79,12 +80,31 @@ class MigracionesFlywayTest {
 		assertThat(jdbc.queryForObject(
 				"select exists (select 1 from pg_extension where extname = 'unaccent')", Boolean.class)).isTrue();
 
-		// V10 a V17.
+		// V10 a V17, y datos en el formato anterior a las validaciones del formulario (tildes y minúsculas).
+		flyway("17").migrate();
+		jdbc.update("""
+				insert into persona (nombres, apellidos, tipo_documento, documento, fecha_nacimiento, genero,
+				    telefono_pais, telefono_numero, correo, ciudad, eps, eps_otra)
+				values ('maría josé', 'muñoz  peña', 'CC', '54876234', date '1990-05-14', 'Femenino', 'CO',
+				    '3001234567', 'ana@example.com', 'Medellín', 'Otra', 'Medimás')""");
+		long persona = jdbc.queryForObject("select id from persona", Long.class);
+		jdbc.update("""
+				insert into contacto_emergencia (persona_id, nombre, telefono_pais, telefono_numero, parentesco)
+				values (?, 'luis pérez', 'CO', '3157654321', 'Madre')""", persona);
+
+		// V18 convierte lo existente a la forma normalizada y añade las restricciones nuevas.
 		flyway(null).migrate();
 		assertThat(jdbc.queryForObject("select max(version::int) from flyway_schema_history where success", Integer.class))
-				.isEqualTo(17);
+				.isEqualTo(19);
 		assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where success and version is not null",
-				Integer.class)).isEqualTo(17);
+				Integer.class)).isEqualTo(19);
+		Map<String, Object> convertida = jdbc.queryForMap(
+				"select nombres, apellidos, ciudad, eps_otra, documento, correo from persona where id = ?", persona);
+		assertThat(convertida).containsEntry("nombres", "MARIA JOSE").containsEntry("apellidos", "MUÑOZ PEÑA")
+				.containsEntry("ciudad", "Medellin").containsEntry("eps_otra", "Medimas")
+				.containsEntry("documento", "54876234").containsEntry("correo", "ana@example.com");
+		assertThat(jdbc.queryForObject("select nombre from contacto_emergencia where persona_id = ?", String.class,
+				persona)).isEqualTo("LUIS PEREZ");
 
 		// Secuencias: 1, 2, 3...
 		assertThat(jdbc.queryForList("select nextval('inscripcion_codigo_seq') from generate_series(1,3)", Long.class))
@@ -97,7 +117,7 @@ class MigracionesFlywayTest {
 	void laAplicacionArrancaConValidateSobreElEsquemaCompleto() {
 		// El contexto ya cargó con ddl-auto=validate: si una entidad no coincidiera con la base, no habría arrancado.
 		assertThat(jdbcApp.queryForObject("select max(version::int) from flyway_schema_history where success",
-				Integer.class)).isEqualTo(17);
+				Integer.class)).isEqualTo(19);
 	}
 
 }

@@ -1,6 +1,6 @@
 {
-  "firstName": "Ana María",
-  "lastName": "Pérez Gómez",
+  "firstName": "ANA MARIA",
+  "lastName": "PEREZ GOMEZ",
   "documentType": "CC",
   "document": "1065123456",
   "birthDate": "1990-05-14",
@@ -10,7 +10,7 @@
   "city": "Valledupar",
   "eps": { "entity": "Nueva EPS", "other": null },
   "emergencyContact": {
-    "name": "Luis Pérez",
+    "name": "LUIS PEREZ",
     "phone": { "country": "CO", "number": "3157654321" },
     "relationship": "Hermano o hermana"
   },

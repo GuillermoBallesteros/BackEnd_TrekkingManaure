@@ -90,12 +90,13 @@ public class ReservaService {
 
 	@Transactional
 	public Registration crear(NewRegistration entrada) {
-		NuevaReserva reserva = mapper.aModelo(entrada);
+		// El catálogo trae el indicativo de cada país, necesario para normalizar los teléfonos antes de validar.
+		CatalogoReglas catalogo = catalogos.catalogos();
+		NuevaReserva reserva = mapper.aModelo(entrada, catalogo);
 
 		// Primero el bloqueo global: serializa la comprobación de documento y de cupo (diseño §9).
 		ConfiguracionEvento cfg = configuracion.obtenerConBloqueo();
 		LocalDate hoy = LocalDate.now(clock);
-		CatalogoReglas catalogo = catalogos.catalogos();
 		ParametrosEvento evento = new ParametrosEvento(cfg.getFechaApertura(), cfg.getFechaEventoInicio(),
 				cfg.getFechaCierre(), cfg.getVersionTerminos());
 

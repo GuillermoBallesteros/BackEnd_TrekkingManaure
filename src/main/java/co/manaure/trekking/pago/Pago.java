@@ -16,7 +16,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
-/** Pago de una inscripción (Nequi/Bre-B, sin pasarela). Monto en pesos enteros. */
+/** Pago de una inscripción (llave Bre-B, sin pasarela). Monto en pesos enteros. */
 @Entity
 @Table(name = "pago")
 public class Pago {

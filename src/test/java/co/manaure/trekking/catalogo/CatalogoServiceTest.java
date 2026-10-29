@@ -26,7 +26,7 @@ class CatalogoServiceTest {
 		assertThat(catalogos.estadias()).extracting(Estadia::getClave)
 				.containsExactly("Páramo", "Hotel en Manaure", "Regreso a casa");
 		assertThat(catalogos.extras()).hasSize(3);
-		assertThat(catalogos.eps()).hasSize(25);
+		assertThat(catalogos.eps()).hasSize(29);
 		assertThat(catalogos.parentescos()).hasSize(11);
 		assertThat(catalogos.paises()).hasSize(13);
 	}
@@ -53,7 +53,7 @@ class CatalogoServiceTest {
 		assertThat(co.getIndicativo()).isEqualTo("57");
 		assertThat(co.getMovilLargos()).containsExactly((short) 10);
 		assertThat(co.getMovilInicios()).containsExactly("3");
-		assertThat(co.getFijoInicios()).containsExactly("60");
+		assertThat(co.getFijoInicios()).containsExactly("601", "602", "604", "605", "606", "607", "608");
 		PaisTelefono ar = catalogos.pais("AR").orElseThrow();
 		assertThat(ar.getMovilLargos()).containsExactly((short) 10, (short) 11);
 		assertThat(ar.admiteFijo()).isFalse();
@@ -64,7 +64,7 @@ class CatalogoServiceTest {
 	void laCacheDevuelveLosMismosDatosYSePuedeRecargar() {
 		assertThat(catalogos.eps("Otra")).isPresent();
 		catalogos.recargar();
-		assertThat(catalogos.eps()).hasSize(25);
+		assertThat(catalogos.eps()).hasSize(29);
 	}
 
 }

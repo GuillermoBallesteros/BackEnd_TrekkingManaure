@@ -4,7 +4,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 
 import org.springframework.stereotype.Component;
 
@@ -23,7 +22,8 @@ import co.manaure.trekking.api.dto.TiposReserva.PreEventHotel;
 import co.manaure.trekking.pago.ConceptoPago;
 import co.manaure.trekking.pago.Pago;
 import co.manaure.trekking.pago.RevisionPago;
-import co.manaure.trekking.regla.ValidadorCorreo;
+import co.manaure.trekking.regla.CatalogoReglas;
+import co.manaure.trekking.regla.Normalizador;
 import co.manaure.trekking.regla.modelo.AcompananteRegla;
 import co.manaure.trekking.regla.modelo.Compromisos;
 import co.manaure.trekking.regla.modelo.Consentimiento;
@@ -51,19 +51,21 @@ public class ReservaMapper {
 	// --- entrada: JSON -> modelo de reglas
 
 	/**
-	 * Normaliza antes de validar (diseño §8): el documento en mayúsculas (se valida y se guarda así, sin recortar
-	 * espacios) y el correo en minúsculas.
+	 * Normaliza antes de validar (diseño §8, {@link Normalizador}): nombres en MAYÚSCULAS y sin tildes (la Ñ se
+	 * conserva), ciudad y EPS "Otra" sin tildes, documento sin separadores y en mayúsculas, teléfonos solo con
+	 * dígitos y sin indicativo, y correo en minúsculas. Lo normalizado es lo que se valida y se guarda; los detalles
+	 * de salud no se tocan. El catálogo aporta el indicativo de cada país.
 	 */
-	public NuevaReserva aModelo(NewRegistration r) {
+	public NuevaReserva aModelo(NewRegistration r, CatalogoReglas catalogos) {
 		PersonaRegla titular = persona(r.firstName(), r.lastName(), r.documentType(), r.document(), r.birthDate(),
 				r.gender(), r.phone(), r.email(), r.city(), r.eps(), r.emergencyContact(), r.health(),
-				r.commitments(), r.consent(), r.stay());
+				r.commitments(), r.consent(), r.stay(), catalogos);
 		NewCompanion c = r.companion();
 		AcompananteRegla acompanante = c == null ? null
 				: new AcompananteRegla(
 						persona(c.firstName(), c.lastName(), c.documentType(), c.document(), c.birthDate(),
 								c.gender(), c.phone(), c.email(), c.city(), c.eps(), c.emergencyContact(),
-								c.health(), c.commitments(), c.consent(), c.stay()),
+								c.health(), c.commitments(), c.consent(), c.stay(), catalogos),
 						Boolean.TRUE.equals(c.kit()), c.shirtSize());
 		HotelSolicitado hotel = r.preEventHotel() == null ? null
 				: new HotelSolicitado(r.preEventHotel().checkIn(), r.preEventHotel().checkOut(),
@@ -75,20 +77,20 @@ public class ReservaMapper {
 	private static PersonaRegla persona(String nombres, String apellidos, String tipoDocumento, String documento,
 			String nacimiento, String genero, Phone telefono, String correo, String ciudad, Eps eps,
 			EmergencyContact contacto, Health salud, Commitments compromisos, Consent consentimiento,
-			String estadia) {
-		return new PersonaRegla(nombres, apellidos, tipoDocumento, mayusculas(documento), nacimiento, genero,
-				new Telefono(telefono.country(), telefono.number()), ValidadorCorreo.normalizar(correo), ciudad,
-				new EpsElegida(eps.entity(), eps.other()),
-				new ContactoRegla(contacto.name(), new Telefono(contacto.phone().country(), contacto.phone().number()),
+			String estadia, CatalogoReglas catalogos) {
+		return new PersonaRegla(Normalizador.nombre(nombres), Normalizador.nombre(apellidos), tipoDocumento,
+				Normalizador.documento(documento), nacimiento, genero,
+				Normalizador.telefono(new Telefono(telefono.country(), telefono.number()), catalogos),
+				Normalizador.correo(correo), Normalizador.lugar(ciudad),
+				new EpsElegida(eps.entity(), Normalizador.lugar(eps.other())),
+				new ContactoRegla(Normalizador.nombre(contacto.name()),
+						Normalizador.telefono(new Telefono(contacto.phone().country(), contacto.phone().number()),
+								catalogos),
 						contacto.relationship()),
 				new SaludRegla(salud.illness(), salud.allergies(), salud.disability(), salud.exercises()),
 				new Compromisos(compromisos.protectedAreas(), compromisos.environment()),
 				new Consentimiento(consentimiento.acceptedAt(), consentimiento.version(), consentimiento.imageUse()),
 				estadia);
-	}
-
-	private static String mayusculas(String documento) {
-		return documento == null ? null : documento.toUpperCase(Locale.ROOT);
 	}
 
 	// --- salida: dominio -> JSON

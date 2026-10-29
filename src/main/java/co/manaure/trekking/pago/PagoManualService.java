@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,10 +43,11 @@ public class PagoManualService {
 	private final GeneradorCodigos codigos;
 	private final AuditoriaService auditoria;
 	private final Clock clock;
+	private final ApplicationEventPublisher eventos;
 
 	public PagoManualService(ConfiguracionService configuracion, InscripcionRepository inscripciones,
 			InscripcionParticipanteRepository participantes, PagoRepository pagos, AprobacionPago aprobacion,
-			GeneradorCodigos codigos, AuditoriaService auditoria, Clock clock) {
+			GeneradorCodigos codigos, AuditoriaService auditoria, Clock clock, ApplicationEventPublisher eventos) {
 		this.configuracion = configuracion;
 		this.inscripciones = inscripciones;
 		this.participantes = participantes;
@@ -54,6 +56,7 @@ public class PagoManualService {
 		this.codigos = codigos;
 		this.auditoria = auditoria;
 		this.clock = clock;
+		this.eventos = eventos;
 	}
 
 	/** @param monto pesos enteros; {@code null} si el cliente no envió un entero. */
@@ -90,6 +93,8 @@ public class PagoManualService {
 		aprobacion.fijarActiva(inscripcion, personas, activaDespues);
 		auditoria.registrar(administradorId, AccionAuditoria.REGISTRAR_PAGO_MANUAL, EntidadAuditoria.PAGO,
 				pago.getCodigo(), inscripcion.getCodigo() + " monto=" + monto);
+		// Avisos por correo (HU-N15): el pago manual nace aprobado.
+		eventos.publishEvent(new PagoRevisadoEvent(pago.getCodigo(), RevisionPago.APROBADO));
 		return pago;
 	}
 

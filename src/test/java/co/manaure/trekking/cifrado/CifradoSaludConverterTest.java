@@ -118,13 +118,13 @@ class CifradoSaludConverterTest {
 
 	@Test
 	void toStringDeFichaSaludYDeSuDtoNoMuestraValores() {
-		Persona persona = new Persona("Maria", "Perez", "CC", "DOC12345", java.time.LocalDate.of(1990, 5, 14),
+		Persona persona = new Persona("MARIA", "PEREZ", "CC", "12345678", java.time.LocalDate.of(1990, 5, 14),
 				"Femenino", "CO", "3001234567", "maria@example.com", "Valledupar", "Nueva EPS", null);
 		FichaSalud ficha = new FichaSalud(persona, "Asma severa", "Penicilina", "Visual", true);
 		SaludDto dto = new SaludDto("Asma severa", "Penicilina", "Visual", true);
 
 		for (String texto : new String[] { ficha.toString(), dto.toString(), persona.toString() }) {
-			assertThat(texto).doesNotContain("Asma", "Penicilina", "Visual", "DOC12345", "Maria", "maria@example.com");
+			assertThat(texto).doesNotContain("Asma", "Penicilina", "Visual", "12345678", "MARIA", "maria@example.com");
 		}
 		assertThat(ficha.isTieneEnfermedad()).isTrue();
 		assertThat(ficha.isTieneAlergias()).isTrue();
