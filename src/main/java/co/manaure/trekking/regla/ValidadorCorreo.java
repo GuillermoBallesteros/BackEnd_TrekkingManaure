@@ -28,9 +28,9 @@ public final class ValidadorCorreo {
 	private ValidadorCorreo() {
 	}
 
-	/** El servidor pasa el correo a minúsculas antes de validar (diseño §8, [SUPUESTO]). */
+	/** El servidor pasa el correo a minúsculas y sin espacios antes de validar (diseño §8). */
 	public static String normalizar(String correo) {
-		return correo == null ? null : correo.toLowerCase(Locale.ROOT);
+		return Normalizador.correo(correo);
 	}
 
 	/** {@code quien}: "del participante"; {@code campo}: ruta del correo ({@code email}, {@code companion.email}). */
@@ -39,7 +39,7 @@ public final class ValidadorCorreo {
 		if (email.isEmpty()) {
 			return ErrorRegla.de(CodigoError.CORREO_INVALIDO, "Escribe el correo electrónico " + quien + ".", campo);
 		}
-		if (email.length() > 254 || email.contains("..") || !CORREO.matcher(email).matches()) {
+		if (email.length() > Textos.CORREO_MAX || email.contains("..") || !CORREO.matcher(email).matches()) {
 			return ErrorRegla.de(CodigoError.CORREO_INVALIDO, "Revisa el correo electrónico " + quien + ".", campo);
 		}
 		String dominio = email.substring(email.indexOf('@') + 1);

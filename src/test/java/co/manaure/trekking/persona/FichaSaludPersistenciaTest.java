@@ -38,7 +38,7 @@ class FichaSaludPersistenciaTest {
 	}
 
 	private Persona persona() {
-		return personas.save(new Persona("Maria", "Perez", "CC", "DOC12345", LocalDate.of(1990, 5, 14), "Femenino",
+		return personas.save(new Persona("MARIA", "PEREZ", "CC", "12345678", LocalDate.of(1990, 5, 14), "Femenino",
 				"CO", "3001234567", "maria@example.com", "Valledupar", "Nueva EPS", null));
 	}
 

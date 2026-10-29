@@ -50,21 +50,38 @@ El estado de una inscripción no se guarda: se deriva de sus pagos (sección 9).
 10. Marca la **autorización del menor** cuando recibe el documento.
 11. Ajusta los **cupos del páramo** y la **fecha de cierre**.
 
+### Sistema (avisos por correo)
+12. Envía por correo, con Brevo, los recordatorios del saldo, la aprobación o el rechazo de cada pago y el aviso de la víspera del evento (RN-24).
+
 ## 5. Datos por persona (titular y acompañante) [CONFIRMADO]
 Mismos campos para ambos (`Person` en el front); el acompañante añade `kit` y `shirtSize`.
 
+**Normalización (antes de validar y de guardar).** El front la aplica al escribir y al enviar; el backend siempre la repite (`Normalizador`) y la base la comprueba con CHECK (V18). Las longitudes se miden sobre el texto ya normalizado.
+
+| Campo | Qué se hace |
+|---|---|
+| Todo texto | sin espacios al inicio y al final, espacios dobles a uno, Unicode NFC |
+| Nombres, apellidos, nombre del contacto | MAYÚSCULAS y sin tildes (Á→A, É→E, Í→I, Ó→O, Ú→U, Ü→U y cualquier otra marca latina como è, ã, ç); la Ñ se conserva (PEÑA no es PENA); ’ pasa a ' |
+| Ciudad, EPS "Otra" | sin tildes (la Ñ se conserva), con las mayúsculas que escribió la persona |
+| Documento | sin puntos, espacios ni guiones, en mayúsculas |
+| Teléfono | solo dígitos; si trae el indicativo (+57) delante, se quita |
+| Correo | minúsculas y sin espacios |
+| Detalles de salud | no se normalizan: se guardan tal como se escriben, con sus tildes |
+
+Ejemplos: `María José` → `MARIA JOSE`; `Muñoz Peña` → `MUÑOZ PEÑA`; `Ürümqi` → `URUMQI`; `1.098.726.541` → `1098726541`; `Ana@Gmail.com` → `ana@gmail.com`; `+57 300 123 4567` → `3001234567`; `Valledupar` → `Valledupar`.
+
 | Campo | Regla (mensajes literales en `diseno.md` §12) |
 |---|---|
-| Nombres, apellidos | 2 a 60 caracteres; palabras de letras (con tildes y ñ) separadas por espacio, guion o apóstrofe |
+| Nombres, apellidos | 2 a 40 caracteres; solo A-Z y Ñ (al escribir se aceptan tildes), apóstrofe, guion y espacio; un solo separador entre palabras. Se guardan en MAYÚSCULAS y sin tildes (la Ñ se conserva) |
 | Tipo de documento | CC, CE, TI, RC, Pasaporte, PPT (tabla 5.1) |
-| Documento | patrón del tipo; se compara sin espacios y en mayúsculas |
+| Documento | patrón del tipo (tabla 5.1); se normaliza antes de validar: sin puntos, espacios ni guiones y en mayúsculas (1.098.726.541 pasa a 1098726541) |
 | Fecha de nacimiento | AAAA-MM-DD válida, no futura, edad <= 110 |
 | Género | Femenino, Masculino, Otro, Prefiero no decirlo [lista provisional en el front] |
-| Teléfono | país del catálogo (tabla 5.2) y número nacional de solo dígitos; debe ser celular |
-| Correo | formato válido, minúsculas, máx. 254; se rechazan dominios mal escritos conocidos (gmial.com, etc.) |
-| Ciudad | 3 a 60 caracteres; letras, espacios, guion, apóstrofe y punto de abreviatura |
-| EPS | una de la lista (5.3). Con `Otra` es obligatorio el nombre (3 a 60); con cualquier otra el nombre debe venir nulo |
-| Contacto de emergencia | nombre (5 a 120, al menos dos palabras), teléfono (celular o fijo) y parentesco (5.4) |
+| Teléfono | país del catálogo (tabla 5.2) y número nacional de solo dígitos (si traía el indicativo delante, se quita); debe ser celular |
+| Correo | formato válido, minúsculas y sin espacios, máx. 100; sin dos puntos seguidos; se rechazan dominios mal escritos conocidos (gmial.com, etc.) |
+| Ciudad | 3 a 40 caracteres; letras, Ñ, espacios, guion, apóstrofe y punto de abreviatura. Se guarda sin tildes y con las mayúsculas escritas [SUPUESTO, por confirmar] |
+| EPS | una de la lista (5.3). Con `Otra` es obligatorio el nombre (3 a 40, solo letras y espacios, sin tildes); con cualquier otra el nombre debe venir nulo |
+| Contacto de emergencia | nombre (5 a 80, al menos dos palabras, MAYÚSCULAS y sin tildes), teléfono (celular o fijo) y parentesco (5.4) |
 | Salud | `illness`, `allergies`, `disability`: nulo, o texto de 2 a 200 caracteres sin espacios en los extremos; `exercises`: booleano obligatorio |
 | Compromisos | `protectedAreas` y `environment` deben ser `true` |
 | Consentimiento | `version` igual a la vigente (`TYC-2026-10-28`), `acceptedAt` con fecha válida, `imageUse` booleano (opcional para la persona, pero siempre presente) |
@@ -77,21 +94,21 @@ La hora de aceptación (`acceptedAt`) definitiva la pone el servidor al registra
 ### 5.1 Documentos por tipo
 | Tipo | Formato | Edad |
 |---|---|---|
-| CC | 6 a 10 dígitos | 18 años o más |
+| CC | 8 a 10 dígitos, no empieza por 0 | 18 años o más |
 | CE | 6 a 10 dígitos | sin límite |
 | TI | 10 u 11 dígitos | 7 a 18 años |
 | RC | 10 dígitos | hasta 7 años |
-| Pasaporte | 5 a 20 letras o números | sin límite |
-| PPT | 5 a 15 letras o números | sin límite |
+| Pasaporte | 6 a 12 letras o números | sin límite |
+| PPT | 5 a 8 dígitos | sin límite |
 
-Los rangos de edad están "por confirmar con el cliente" en el front [SUPUESTO heredado]. La edad se calcula a la fecha de hoy (Bogotá).
+Todos los tipos son numéricos salvo el pasaporte. La CC de 8 a 10 dígitos la fijó el cliente (cubre 54876234 y 1098726541); los rangos de CE, RC, PPT y pasaporte y las edades están "por confirmar con el cliente" [SUPUESTO]. La edad se calcula a la fecha de hoy (Bogotá).
 
 ### 5.2 Teléfonos por país (13 países) [CONFIRMADO]
 Número nacional sin indicativo, solo dígitos. `largos` = cantidad de dígitos; `inicios` = prefijos permitidos. Móvil siempre; fijo solo para el contacto de emergencia.
 
 | ISO | País | Ind. | Móvil: largos / inicios | Fijo: largos / inicios |
 |---|---|---|---|---|
-| CO | Colombia | 57 | 10 / 3 | 10 / 60 |
+| CO | Colombia | 57 | 10 / 3 | 10 / 601, 602, 604, 605, 606, 607, 608 |
 | VE | Venezuela | 58 | 10 / 41, 42 | 10 / 2 |
 | EC | Ecuador | 593 | 9 / 9 | 8 / 2-7 |
 | PE | Perú | 51 | 9 / 9 | 8 / 1, 4, 5, 6, 7, 8 |
@@ -108,7 +125,7 @@ Número nacional sin indicativo, solo dígitos. `largos` = cantidad de dígitos;
 País predeterminado: CO. Dos números son el mismo si coinciden `+indicativo` + número.
 
 ### 5.3 EPS
-Nueva EPS, EPS Sura, EPS Sanitas, Salud Total, Compensar, Famisanar, Coosalud, Mutual SER, Cajacopi, Asmet Salud, Emssanar, Savia Salud, Capresoca, Comfenalco Valle, Capital Salud, Aliansalud, Dusakawi, Anas Wayuu, Pijaos Salud, Mallamas, Comfachocó, Comfaoriente, Régimen especial o de excepción, Otra, No tengo EPS. "Lista por confirmar con el cliente" en el front [SUPUESTO heredado].
+Nueva EPS, EPS Sura, EPS Sanitas, Salud Total, Compensar, Famisanar, Coosalud, Mutual SER, Cajacopi, Asmet Salud, Emssanar, Savia Salud, Capresoca, Comfenalco Valle, Capital Salud, Aliansalud, Dusakawi, Anas Wayuu, Pijaos Salud, Mallamas, Comfachocó, Comfaoriente, Salud Mía, SOS (Servicio Occidental de Salud), EPS Familiar de Colombia, AIC (Asociación Indígena del Cauca), Régimen especial o de excepción, Otra, No tengo EPS (29 valores). Contrastada con el listado del Ministerio de Salud (5 de junio de 2025) y con prensa de 2026; la lista cambia con frecuencia, por eso existe `Otra`. Una EPS nueva se agrega con una migración (`INSERT` en `eps`); ninguna se quita ni se renombra mientras haya reservas que la usen.
 
 ### 5.4 Parentescos del contacto de emergencia
 Madre, Padre, Tutor legal o acudiente, Cónyuge o pareja, Hijo o hija, Hermano o hermana, Abuelo o abuela, Tío o tía, Primo o prima, Otro familiar, Amigo o amiga. Responsable legal de un titular menor: solo Madre, Padre o Tutor legal o acudiente.
@@ -172,6 +189,12 @@ Madre, Padre, Tutor legal o acudiente, Cónyuge o pareja, Hijo o hija, Hermano o
 - **RN-21** [CONFIRMADO] Si el pagado >= total, el estado es `Pagado`. El excedente no se modela: el pago manual no puede superar el saldo.
 - **RN-22** [CONFIRMADO + decisión del usuario, hallazgo H4] **Caducidad a 12 horas del pago sin verificar**: una reserva que no tiene ningún pago `Aprobado` y cuyo pago lleva 12 horas o más en `Por revisar` pasa a `Rechazado` automáticamente (el pago queda `Rechazado` con el motivo "No se verificó el pago dentro de 12 horas.", la reserva inactiva y sus documentos libres, como si la encargada la rechazara). La antigüedad se mide desde que el pago entró en `Por revisar` (su creación o la última vez que la encargada lo devolvió a `Por revisar`), no desde la creación de la reserva. Una reserva con cualquier pago aprobado nunca caduca; los pagos manuales nacen aprobados y no se tocan. La encargada puede devolver ese pago a `Por revisar` (RN-14, RN-18). No cambia los cupos: una reserva sin pago aprobado no ocupa cupo. Las horas son configurables (`app.reservas.caducidad.horas`).
 - **RN-23** [CONFIRMADO + decisión del usuario, hallazgo H4] **Tope de reservas por IP**: además de 10 solicitudes por minuto, una misma IP puede hacer como máximo 20 solicitudes a `POST /api/v1/reservas` en 24 horas (cuentan todas, también las que fallan por validación). Pasado el tope responde 429 `DEMASIADAS_SOLICITUDES` con `Retry-After` y se genera una alerta única por IP y ventana (log y auditoría, sin datos personales). Cuando el documento ya está reservado, el 409 `DOCUMENTO_DUPLICADO` público añade: "Si no fuiste tú, comunícate con la organización para que la revisen." (el panel conserva el mensaje original).
+- **RN-24** [CONFIRMADO, decisión del usuario 2026-10-28] **Avisos por correo (Brevo)**: el backend envía correos transaccionales con plantillas de Brevo, desde `manaureecoturisticointernacional@manaurevive.com`, sin datos de salud, documento ni EPS. Solo correo: no se envían SMS ni WhatsApp.
+  - Recordatorio del saldo 3 días antes, 1 día antes y el mismo día de la fecha compromiso, a las 12:00 (Bogotá), si la inscripción está en `Saldo pendiente`.
+  - Aviso de vencimiento el día siguiente a la fecha compromiso, a las 12:00, si está en `Vencido`.
+  - Aprobación de un pago (revisión o pago manual) y rechazo (por la encargada o por caducidad, RN-22), en el momento y con el motivo en el rechazo. Un aviso por pago y por tipo: deshacer y repetir una revisión no lo reenvía.
+  - Víspera del evento (`fechaEventoInicio` - 1), a las 12:00: a cada persona (titular y acompañante) de las inscripciones en `Pagado`.
+  - Los avisos de pago van al titular. Un aviso (tipo y referencia) nunca se envía dos veces a la misma inscripción. Un fallo temporal de Brevo se reintenta en el momento (hasta 3 veces); si persiste queda como fallido y se vuelve a intentar si la tarea corre otra vez ese día.
 
 ## 9. Estados derivados [CONFIRMADO]
 Se calculan al consultar; no se guardan. `pagado` = suma de pagos `Aprobado`. `hoy` = fecha en Bogotá.
@@ -211,7 +234,7 @@ Formato ProblemDetail con campo `code` estable en mayúsculas y `detail` en espa
 | 429 | Demasiados intentos |
 
 ## 13. Fuera de alcance
-Pasarela o API de Bre-B/Nequi; WhatsApp o correo desde el backend; devolución de dinero; anular una inscripción (el estado `Rechazado` cumple ese papel); anular o editar un pago (se rechaza o se devuelve a `Por revisar`); corregir los datos de una persona; modificar la reserva ya creada; resumen, tablero o exportación a CSV/Excel en el servidor (el panel los arma con la lista); cotización en el servidor; consulta pública del estado; varios eventos; varios administradores o roles; n8n.
+Pasarela o API de Bre-B/Nequi; WhatsApp o SMS desde el backend (el correo está en RN-24); devolución de dinero; anular una inscripción (el estado `Rechazado` cumple ese papel); anular o editar un pago (se rechaza o se devuelve a `Por revisar`); corregir los datos de una persona; modificar la reserva ya creada; resumen, tablero o exportación a CSV/Excel en el servidor (el panel los arma con la lista); cotización en el servidor; consulta pública del estado; varios eventos; varios administradores o roles; n8n.
 
 ## 14. Decisiones abiertas
 Ver `docs/diseno.md` §16 (lista numerada de preguntas concretas). Las principales: menores como acompañante, reactivar una inscripción rechazada con documento tomado, dominio del front y del API (SameSite), origen de los precios (GET /config o `shared/config`), valores de bloqueo y límites, retención de datos y texto legal.

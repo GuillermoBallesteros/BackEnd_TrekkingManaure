@@ -6,6 +6,7 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,10 +46,11 @@ public class RevisionPagoService {
 	private final AuditoriaService auditoria;
 	private final ReservaAdminService reservas;
 	private final Clock clock;
+	private final ApplicationEventPublisher eventos;
 
 	public RevisionPagoService(ConfiguracionService configuracion, InscripcionRepository inscripciones,
 			InscripcionParticipanteRepository participantes, PagoRepository pagos, AprobacionPago aprobacion,
-			AuditoriaService auditoria, ReservaAdminService reservas, Clock clock) {
+			AuditoriaService auditoria, ReservaAdminService reservas, Clock clock, ApplicationEventPublisher eventos) {
 		this.configuracion = configuracion;
 		this.inscripciones = inscripciones;
 		this.participantes = participantes;
@@ -57,6 +59,7 @@ public class RevisionPagoService {
 		this.auditoria = auditoria;
 		this.reservas = reservas;
 		this.clock = clock;
+		this.eventos = eventos;
 	}
 
 	@Transactional
@@ -87,6 +90,8 @@ public class RevisionPagoService {
 			aplicar(cfg, inscripcion, pago, todos, nueva, motivoFinal, administradorId);
 			auditoria.registrar(administradorId, accion(nueva), EntidadAuditoria.PAGO, pago.getCodigo(),
 					anterior + ">" + nueva);
+			// Avisos por correo (HU-N15): se atienden solo si esta transacción se confirma.
+			eventos.publishEvent(new PagoRevisadoEvent(pago.getCodigo(), nueva));
 		}
 		return reservas.registrations(List.of(inscripcion)).get(0);
 	}
@@ -117,6 +122,7 @@ public class RevisionPagoService {
 				aplicar(cfg, inscripcion, pago, todos, RevisionPago.RECHAZADO, motivo, null);
 				auditoria.registrar(null, AccionAuditoria.RECHAZO_AUTOMATICO, EntidadAuditoria.PAGO, pago.getCodigo(),
 						RevisionPago.POR_REVISAR + ">" + RevisionPago.RECHAZADO);
+				eventos.publishEvent(new PagoRevisadoEvent(pago.getCodigo(), RevisionPago.RECHAZADO));
 				alguno = true;
 			}
 		}

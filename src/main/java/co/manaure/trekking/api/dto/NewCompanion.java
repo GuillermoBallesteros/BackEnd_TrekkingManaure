@@ -12,11 +12,11 @@ import jakarta.validation.constraints.Size;
 
 /** Acompañante de {@link NewRegistration}: {@code Person} aplanada más {@code kit} y {@code shirtSize}. */
 public record NewCompanion(
-		@Size(max = TiposReserva.MAX_TEXTO) String firstName, @Size(max = TiposReserva.MAX_TEXTO) String lastName,
+		@Size(max = TiposReserva.MAX_NOMBRE) String firstName, @Size(max = TiposReserva.MAX_NOMBRE) String lastName,
 		@Size(max = TiposReserva.MAX_CODIGO) String documentType, @Size(max = TiposReserva.MAX_CODIGO) String document,
 		@Size(max = TiposReserva.MAX_CODIGO) String birthDate, @Size(max = TiposReserva.MAX_CODIGO) String gender,
-		@NotNull @Valid Phone phone, @Size(max = TiposReserva.MAX_TEXTO) String email,
-		@Size(max = TiposReserva.MAX_TEXTO) String city, @NotNull @Valid Eps eps,
+		@NotNull @Valid Phone phone, @Size(max = TiposReserva.MAX_CORREO) String email,
+		@Size(max = TiposReserva.MAX_NOMBRE) String city, @NotNull @Valid Eps eps,
 		@NotNull @Valid EmergencyContact emergencyContact, @NotNull @Valid Health health,
 		@NotNull @Valid Commitments commitments, @NotNull @Valid Consent consent, @Size(max = TiposReserva.MAX_CODIGO) String stay,
 		@NotNull Boolean kit, @Size(max = TiposReserva.MAX_CODIGO) String shirtSize) {

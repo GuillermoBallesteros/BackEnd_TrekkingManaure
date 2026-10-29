@@ -1,6 +1,7 @@
 # El dominio llega por la variable de entorno DOMAIN. Caddy obtiene el certificado
 # y redirige HTTP -> HTTPS automáticamente.
 # Este Caddyfile solo lo usa docker-compose.prod.yml, por eso el HSTS vive aquí y no en la API.
+# Un solo origen: /api/* y /actuator/health van a la API; el resto, al sitio y al panel (web).
 {$DOMAIN} {
 	encode zstd gzip
 
@@ -18,5 +19,22 @@
 		-Server
 	}
 
-	reverse_proxy api:8080
+	handle /api/* {
+		reverse_proxy api:8080
+	}
+
+	handle /actuator/health* {
+		reverse_proxy api:8080
+	}
+
+	# Sitio y panel. La API trae su propia CSP; esta es la del sitio: imágenes de Cloudinary y
+	# banderas de flagcdn, estilos en línea de React (atributo style) y nada más de terceros.
+	handle {
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https://res.cloudinary.com https://flagcdn.com; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		reverse_proxy web:8080
+	}
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
 }

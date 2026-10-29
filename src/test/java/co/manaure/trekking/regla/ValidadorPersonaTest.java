@@ -35,31 +35,33 @@ class ValidadorPersonaTest {
 		assertThat(validar(Datos.persona())).isEmpty();
 	}
 
-	// --- nombres
+	// --- nombres (llegan ya normalizados: MAYÚSCULAS, sin tildes, la Ñ se conserva)
 
 	@ParameterizedTest
-	@ValueSource(strings = { "María José", "D'Angelo", "Ana-Lucía", "Ñandú Peña", "Jo" })
+	@ValueSource(strings = { "MARIA JOSE", "D'ANGELO", "ANA-LUCIA", "ÑANDU PEÑA", "JO", "LEFEVRE" })
 	void nombresValidos(String nombre) {
 		assertThat(validar(PB.titular().nombres(nombre).build())).isEmpty();
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "Ana2", "A", "Ana  Maria", " Ana", "Ana ", "Ana_", "Ana.", "-Ana" })
+	@ValueSource(strings = { "ANA2", "A", "ANA  MARIA", " ANA", "ANA ", "ANA_", "ANA.", "-ANA", "ANA--MARIA", "ANA - MARIA",
+			"ANA@", "Ana", "MARÍA", "ИВАН" })
 	void nombresInvalidos(String nombre) {
 		assertError(PB.titular().nombres(nombre), CodigoError.NOMBRE_INVALIDO,
-				"Escribe nombres y apellidos del participante solo con letras (2 a 60 caracteres).", "firstName");
+				"Escribe nombres y apellidos del participante solo con letras (2 a 40 caracteres).", "firstName");
 	}
 
 	@Test
-	void nombreDe61CaracteresEsInvalidoYDe60Valido() {
-		assertError(PB.titular().nombres("a".repeat(61)), CodigoError.NOMBRE_INVALIDO,
-				"Escribe nombres y apellidos del participante solo con letras (2 a 60 caracteres).", "firstName");
-		assertThat(validar(PB.titular().nombres("a".repeat(60)).build())).isEmpty();
+	void nombreDe41CaracteresEsInvalidoYDe40Valido() {
+		assertError(PB.titular().nombres("A".repeat(41)), CodigoError.NOMBRE_INVALIDO,
+				"Escribe nombres y apellidos del participante solo con letras (2 a 40 caracteres).", "firstName");
+		assertThat(validar(PB.titular().nombres("A".repeat(40)).build())).isEmpty();
 	}
 
 	@Test
 	void apellidoInvalidoSeReportaEnLastName() {
-		assertThat(error(PB.titular().apellidos("Gómez3")).campo()).isEqualTo("lastName");
+		assertThat(error(PB.titular().apellidos("GOMEZ3")).campo()).isEqualTo("lastName");
+		assertThat(error(PB.titular().apellidos("A".repeat(41))).campo()).isEqualTo("lastName");
 	}
 
 	// --- fecha de nacimiento
@@ -88,23 +90,24 @@ class ValidadorPersonaTest {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "Valledupar", "Sta. Marta", "San José de la Sierra", "Cúcuta", "Rio-Hacha" })
+	@ValueSource(strings = { "Valledupar", "valledupar", "Sta. Marta", "San Jose de la Sierra", "Cucuta", "Rio-Hacha",
+			"Bogota D.C.", "Ñapinda", "L'Aquila" })
 	void ciudadesValidas(String ciudad) {
 		assertThat(validar(PB.titular().ciudad(ciudad).build())).isEmpty();
 	}
 
 	@ParameterizedTest
 	@NullAndEmptySource
-	@ValueSource(strings = { "Ci", "Bogotá1", "Sta.. Marta" })
+	@ValueSource(strings = { "Ci", "Bogota1", "Sta.. Marta", "Bogotá", "Bogota, D.C.", ".Bogota" })
 	void ciudadesInvalidas(String ciudad) {
 		assertError(PB.titular().ciudad(ciudad), CodigoError.CIUDAD_INVALIDA,
 				"Escribe la ciudad del participante solo con letras.", "city");
 	}
 
 	@Test
-	void ciudadDe61CaracteresEsInvalida() {
-		assertThat(error(PB.titular().ciudad("a".repeat(61))).code()).isEqualTo(CodigoError.CIUDAD_INVALIDA);
-		assertThat(validar(PB.titular().ciudad("a".repeat(60)).build())).isEmpty();
+	void ciudadDe41CaracteresEsInvalidaYDe40Valida() {
+		assertThat(error(PB.titular().ciudad("a".repeat(41))).code()).isEqualTo(CodigoError.CIUDAD_INVALIDA);
+		assertThat(validar(PB.titular().ciudad("a".repeat(40)).build())).isEmpty();
 	}
 
 	// --- correo
@@ -132,8 +135,16 @@ class ValidadorPersonaTest {
 	}
 
 	@Test
-	void normalizarCorreoPasaAMinusculas() {
-		assertThat(ValidadorCorreo.normalizar("Ana@Example.COM")).isEqualTo("ana@example.com");
+	void correoDe100CaracteresEsValidoYDe101No() {
+		String local = "a".repeat(100 - "@example.com".length());
+		assertThat(validar(PB.titular().correo(local + "@example.com").build())).isEmpty();
+		assertError(PB.titular().correo("a" + local + "@example.com"), CodigoError.CORREO_INVALIDO,
+				"Revisa el correo electrónico del participante.", "email");
+	}
+
+	@Test
+	void normalizarCorreoPasaAMinusculasYQuitaEspacios() {
+		assertThat(ValidadorCorreo.normalizar(" Ana@Example.COM ")).isEqualTo("ana@example.com");
 		assertThat(ValidadorCorreo.validar(ValidadorCorreo.normalizar("Ana@Example.COM"), "del participante",
 				"email")).isEmpty();
 	}
@@ -162,9 +173,23 @@ class ValidadorPersonaTest {
 				.isEqualTo("Escribe el nombre de la EPS del participante.");
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = { "Medimas", "Salud Vida", "Ñoño Salud" })
+	void epsOtraConNombreValidoPasa(String nombre) {
+		assertThat(validar(PB.titular().eps("Otra", nombre).build())).isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Ab", "Salud2", "Sanitas S.A.", "Salud  Vida", " Salud", "Medimás" })
+	void epsOtraConNombreInvalido(String nombre) {
+		assertThat(error(PB.titular().eps("Otra", nombre)).detail())
+				.isEqualTo("Escribe el nombre de la EPS del participante.");
+	}
+
 	@Test
-	void epsOtraConNombreValidoPasa() {
-		assertThat(validar(PB.titular().eps("Otra", "Sta. Salud").build())).isEmpty();
+	void epsOtraDe40CaracteresEsValidaYDe41No() {
+		assertThat(validar(PB.titular().eps("Otra", "a".repeat(40)).build())).isEmpty();
+		assertThat(error(PB.titular().eps("Otra", "a".repeat(41))).code()).isEqualTo(CodigoError.EPS_INVALIDA);
 	}
 
 	@Test
@@ -176,12 +201,26 @@ class ValidadorPersonaTest {
 	// --- contacto de emergencia
 
 	@ParameterizedTest
-	@ValueSource(strings = { "Luis", "Lu P", "Luis2 Pérez", "" })
+	@ValueSource(strings = { "LUIS", "LU P", "LUIS2 PEREZ", "", "Luis Perez" })
 	void contactoSinNombreYApellido(String nombre) {
 		assertError(PB.titular().contacto(nombre, "CO", "3157654321", "Madre"),
 				CodigoError.CONTACTO_EMERGENCIA_INVALIDO,
 				"Escribe nombre y apellido del contacto de emergencia del participante.",
 				"emergencyContact.name");
+	}
+
+	@Test
+	void contactoDe80CaracteresEsValidoYDe81No() {
+		assertThat(validar(PB.titular().contacto("A".repeat(39) + " " + "B".repeat(40), "CO", "3157654321", "Madre")
+				.build())).isEmpty();
+		assertThat(error(PB.titular().contacto("A".repeat(40) + " " + "B".repeat(40), "CO", "3157654321", "Madre"))
+				.code()).isEqualTo(CodigoError.CONTACTO_EMERGENCIA_INVALIDO);
+	}
+
+	@Test
+	void contactoConLaEnieSeRespetaNoEsLoMismoQueConLaN() {
+		var distinto = PB.titular().apellidos("PEÑA").contacto("ANA MARIA PENA", "CO", "3157654321", "Madre");
+		assertThat(validar(distinto.build())).isEmpty();
 	}
 
 	@Test
@@ -193,28 +232,42 @@ class ValidadorPersonaTest {
 
 	@Test
 	void contactoConElMismoTelefonoQueLaPersona() {
-		assertError(PB.titular().contacto("Luis Pérez", "CO", "3001234567", "Madre"),
+		assertError(PB.titular().contacto("LUIS PEREZ", "CO", "3001234567", "Madre"),
 				CodigoError.CONTACTO_EMERGENCIA_INVALIDO,
 				"El teléfono del contacto de emergencia del participante debe ser distinto al suyo propio.",
 				"emergencyContact.phone.number");
 	}
 
+	@ParameterizedTest
+	@ValueSource(strings = { "6011234567", "6021234567", "6041234567", "6051234567", "6061234567", "6071234567",
+			"6081234567" })
+	void contactoAceptaFijosDeColombia(String fijo) {
+		assertThat(validar(PB.titular().contacto("LUIS PEREZ", "CO", fijo, "Madre").build())).isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "6001234567", "6031234567", "6091234567", "601123456", "60112345678" })
+	void contactoRechazaFijosQueNoExisten(String fijo) {
+		assertThat(error(PB.titular().contacto("LUIS PEREZ", "CO", fijo, "Madre")).code())
+				.isEqualTo(CodigoError.TELEFONO_INVALIDO);
+	}
+
 	@Test
 	void contactoAceptaFijoPeroNoUnNumeroInvalido() {
-		assertThat(validar(PB.titular().contacto("Luis Pérez", "CO", "6011234567", "Madre").build())).isEmpty();
-		assertError(PB.titular().contacto("Luis Pérez", "CO", "1234", "Madre"), CodigoError.TELEFONO_INVALIDO,
+		assertThat(validar(PB.titular().contacto("LUIS PEREZ", "CO", "6011234567", "Madre").build())).isEmpty();
+		assertError(PB.titular().contacto("LUIS PEREZ", "CO", "1234", "Madre"), CodigoError.TELEFONO_INVALIDO,
 				"El teléfono del contacto de emergencia del participante no es válido para Colombia"
 						+ " (ejemplo: 300 123 4567).",
 				"emergencyContact.phone.number");
-		assertThat(error(PB.titular().contacto("Luis Pérez", "XX", "1234", "Madre")).detail())
+		assertThat(error(PB.titular().contacto("LUIS PEREZ", "XX", "1234", "Madre")).detail())
 				.isEqualTo("Elige el país del teléfono del contacto de emergencia del participante.");
-		assertThat(error(PB.titular().contacto("Luis Pérez", "CO", "12a4", "Madre")).detail())
+		assertThat(error(PB.titular().contacto("LUIS PEREZ", "CO", "12a4", "Madre")).detail())
 				.isEqualTo("Escribe el teléfono del contacto de emergencia del participante solo con números.");
 	}
 
 	@Test
 	void contactoConParentescoFueraDeCatalogo() {
-		assertError(PB.titular().contacto("Luis Pérez", "CO", "3157654321", "Vecino"),
+		assertError(PB.titular().contacto("LUIS PEREZ", "CO", "3157654321", "Vecino"),
 				CodigoError.CONTACTO_EMERGENCIA_INVALIDO,
 				"Elige el parentesco del contacto de emergencia del participante.",
 				"emergencyContact.relationship");
@@ -316,7 +369,7 @@ class ValidadorPersonaTest {
 	void conVariosErroresDevuelveElPrimeroEnElOrdenDelDiseno() {
 		var p = PB.titular().estadia("X").compromisos(false, false).genero("X").nombres("1");
 		assertThat(error(p).code()).isEqualTo(CodigoError.NOMBRE_INVALIDO);
-		p.nombres("Ana");
+		p.nombres("ANA");
 		assertThat(error(p).code()).isEqualTo(CodigoError.GENERO_INVALIDO);
 		p.genero("Femenino");
 		assertThat(error(p).code()).isEqualTo(CodigoError.COMPROMISO_REQUERIDO);

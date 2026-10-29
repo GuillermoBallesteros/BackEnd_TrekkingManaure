@@ -18,7 +18,7 @@ public final class ValidadorDocumento {
 	private ValidadorDocumento() {
 	}
 
-	/** El documento se valida tal como llega (sin recortar ni pasar a mayúsculas), como el front. */
+	/** El documento llega ya normalizado (sin puntos, espacios ni guiones y en mayúsculas), como en el front. */
 	public static Optional<ErrorRegla> validar(PersonaRegla persona, Quien quien, LocalDate hoy,
 			CatalogoReglas catalogos) {
 		Optional<ReglaDocumento> regla = catalogos.documento(persona.tipoDocumento());

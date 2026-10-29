@@ -4,7 +4,7 @@ Versión 2: el backend se ajusta al front. Reglas, datos, precios y estados: `do
 
 - Las rutas y los nombres JSON son los del diseño §6 (tipos del front en inglés). Los `code` y estados HTTP, los del diseño §12; el `detail` es el mensaje en español del front.
 - Cada historia incluye sus pruebas: una por criterio.
-- Orden, una historia por sesión: HU-D1 (hecha), HU-N01 a HU-N14 y al final HU-D2 (hecha).
+- Orden, una historia por sesión: HU-D1 (hecha), HU-N01 a HU-N14 y al final HU-D2 (hecha). HU-N15 (avisos por correo) se añadió después, el 2026-10-28.
 - Una historia no empieza hasta que la anterior pasa `./mvnw.cmd test`. Al terminar se informa el resultado real o "no verificado".
 
 ## Resumen de cambios respecto a la versión anterior
@@ -26,6 +26,7 @@ Versión 2: el backend se ajusta al front. Reglas, datos, precios y estados: `do
 | HU-12 Editar configuración | Reducida a HU-N11 (capacidad) y HU-N12 (fecha de cierre) | Es lo único editable en el panel |
 | (nuevo) | HU-N01, HU-N02, HU-N10, HU-N13, HU-N14 | Esquema, reglas, autorización de menores, conexión del front, integración |
 | HU-D2 Producción | Se mantiene, implementada | |
+| (nuevo, 2026-10-28) | HU-N15 | Avisos por correo con Brevo (RN-24) |
 
 ---
 
@@ -372,6 +373,32 @@ Criterios:
 - Se adaptan las pruebas de CORS, rate limit, perfil `prod` y Actuator (no se pierden).
 - El README documenta las variables nuevas (`ADMIN_EMAIL`, `HEALTH_ENCRYPTION_KEY`, `COOKIE_SECURE`), cómo generarlas y la rotación de la clave de cifrado.
 - Se informa lo que no se pudo verificar.
+
+---
+
+## HU-N15 Avisos por correo con Brevo
+Como organización quiero que el sistema avise por correo cuándo pagar el saldo, si un pago se aprobó o se rechazó y que el evento es mañana, para no depender de mensajes manuales.
+
+**Alcance:** paquete `notificacion/` (diseño §2 y §18), migración V19 (`envio_aviso`), cliente HTTP de Brevo, tarea diaria a las 12:00 (Bogotá) y aviso inmediato tras aprobar o rechazar un pago. Sin endpoints nuevos. **Regla:** RN-24.
+
+Criterios de éxito:
+- Con `BREVO_ACTIVO=false` (por defecto) no se envía nada ni se registran envíos, y la API arranca sin `BREVO_API_KEY`.
+- Reserva `apartado` con fecha compromiso 9-nov y separación aprobada: la tarea del 6-nov envía `PAGO_3_DIAS`, la del 8-nov `PAGO_1_DIA`, la del 9-nov `PAGO_HOY` y la del 10-nov `PAGO_VENCIDO`. Ejecutarla dos veces el mismo día no reenvía.
+- Con la separación todavía `Por revisar`, la tarea no envía recordatorios del saldo.
+- Con el saldo ya pagado, no se envía ningún recordatorio del saldo.
+- Aprobar un pago (revisión o pago manual) envía `PAGO_APROBADO` al titular. Rechazarlo envía `PAGO_RECHAZADO` con el motivo. La caducidad (RN-22) envía `PAGO_RECHAZADO` con su motivo.
+- Deshacer y repetir la misma revisión de un pago no reenvía el aviso.
+- La víspera de `fechaEventoInicio`, la tarea envía `EVENTO_MANANA` al titular y al acompañante de cada inscripción `Pagado`.
+- Los parámetros de la plantilla llevan el nombre con mayúscula inicial, el código de la reserva, los montos en pesos y las fechas en español. Nunca documento, EPS ni salud.
+- Si la API arranca después de las 12:00, la tarea corre en ese momento y envía los avisos del día que falten.
+- Un tipo sin plantilla configurada (id 0) se omite con una advertencia sin datos personales.
+
+Criterios de error:
+- Con `BREVO_ACTIVO=true` y sin `BREVO_API_KEY`, la API no arranca y el error nombra la variable, nunca un valor.
+- Una revisión que falla (p. ej. 422 por menor sin autorización) no envía correo.
+- Brevo responde 429 o 5xx: se reintenta hasta 3 veces; si persiste, el envío queda `FALLIDO` y no frena los demás.
+- Brevo responde otro 4xx: el envío queda `FALLIDO` sin reintentar.
+- Ningún log incluye correos, nombres, documentos ni datos de salud.
 
 ---
 

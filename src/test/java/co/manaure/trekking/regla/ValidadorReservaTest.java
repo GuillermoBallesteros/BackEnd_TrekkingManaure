@@ -80,7 +80,7 @@ class ValidadorReservaTest {
 
 	private static PersonaRegla menor(String parentesco) {
 		return PB.titular().tipoDocumento("TI").documento("1234567890").nacimiento("2009-10-29")
-				.contacto("Luis Pérez", "CO", "3157654321", parentesco).build();
+				.contacto("LUIS PEREZ", "CO", "3157654321", parentesco).build();
 	}
 
 	@Test
@@ -99,13 +99,13 @@ class ValidadorReservaTest {
 	@Test
 	void mayorDeEdadConAmigoPasa() {
 		assertThat(validar(Datos.conTitular(base(),
-				PB.titular().contacto("Luis Pérez", "CO", "3157654321", "Amigo o amiga").build()))).isEmpty();
+				PB.titular().contacto("LUIS PEREZ", "CO", "3157654321", "Amigo o amiga").build()))).isEmpty();
 	}
 
 	@Test
 	void unAcompananteMenorSeAceptaConLasReglasGenerales() {
 		var menorAcompanante = PB.acompanante().tipoDocumento("TI").documento("1098765432").nacimiento("2009-10-29")
-				.contacto("Marta Rojas", "CO", "3201112233", "Amigo o amiga").build();
+				.contacto("MARTA ROJAS", "CO", "3201112233", "Amigo o amiga").build();
 		assertThat(validar(conAcompanante(Datos.titular(), menorAcompanante))).isEmpty();
 	}
 
@@ -241,7 +241,7 @@ class ValidadorReservaTest {
 	void acompananteConDatosInvalidosUsaPrefijoYTextoDelAcompanante() {
 		var a = new AcompananteRegla(PB.acompanante().nombres("Carlos9").build(), false, null);
 		assertError(conAcompanante(a), CodigoError.NOMBRE_INVALIDO,
-				"Escribe nombres y apellidos del acompañante solo con letras (2 a 60 caracteres).",
+				"Escribe nombres y apellidos del acompañante solo con letras (2 a 40 caracteres).",
 				"companion.firstName");
 	}
 
@@ -276,7 +276,7 @@ class ValidadorReservaTest {
 
 	@Test
 	void contactoDelTitularEsElAcompanantePorCelular() {
-		var titular = PB.titular().contacto("Luis Pérez", "CO", "3109998877", "Hermano o hermana").build();
+		var titular = PB.titular().contacto("LUIS PEREZ", "CO", "3109998877", "Hermano o hermana").build();
 		assertError(conAcompanante(titular, Datos.persona()), CodigoError.ACOMPANANTE_REPETIDO,
 				"El contacto de emergencia del participante no puede ser el acompañante.",
 				"emergencyContact.phone.number");
@@ -284,7 +284,7 @@ class ValidadorReservaTest {
 
 	@Test
 	void contactoDelAcompananteEsElTitularPorCelular() {
-		var acompanante = PB.acompanante().contacto("Marta Rojas", "CO", "3001234567", "Madre").build();
+		var acompanante = PB.acompanante().contacto("MARTA ROJAS", "CO", "3001234567", "Madre").build();
 		assertError(conAcompanante(Datos.titular(), acompanante), CodigoError.ACOMPANANTE_REPETIDO,
 				"El contacto de emergencia del acompañante no puede ser el participante.",
 				"companion.emergencyContact.phone.number");
@@ -299,7 +299,7 @@ class ValidadorReservaTest {
 
 	@Test
 	void contactoDelAcompananteEsElTitularPorNombre() {
-		var acompanante = PB.acompanante().contacto("Ana María Pérez Gómez", "CO", "3201112233", "Madre").build();
+		var acompanante = PB.acompanante().contacto("ANA MARIA PEREZ GOMEZ", "CO", "3201112233", "Madre").build();
 		assertError(conAcompanante(Datos.titular(), acompanante), CodigoError.ACOMPANANTE_REPETIDO,
 				"El contacto de emergencia del acompañante no puede ser el participante.",
 				"companion.emergencyContact.name");
@@ -426,7 +426,7 @@ class ValidadorReservaTest {
 	@Test
 	void conVariosErroresDevuelveElPrimeroSegunElOrdenDelDiseno() {
 		var titular = PB.titular().nombres("1").tipoDocumento("TI").documento("1234567890").nacimiento("2009-10-29")
-				.contacto("Luis Pérez", "CO", "3157654321", "Amigo o amiga");
+				.contacto("LUIS PEREZ", "CO", "3157654321", "Amigo o amiga");
 		var acompanante = new AcompananteRegla(PB.acompanante().nombres("1").build(), false, null);
 		var hotelMalo = new HotelSolicitado("2026-11-15", "2026-11-16", false);
 		var docs = Set.of("1234567890");
@@ -440,12 +440,12 @@ class ValidadorReservaTest {
 		var r = new NuevaReserva(titular.build(), "Z", acompanante, List.of("x"), hotelMalo, "x", null);
 		assertThat(ValidadorReserva.validar(r, ctx).orElseThrow().code()).isEqualTo(CodigoError.NOMBRE_INVALIDO);
 
-		titular.nombres("Ana");
+		titular.nombres("ANA");
 		r = new NuevaReserva(titular.build(), "Z", acompanante, List.of("x"), hotelMalo, "x", null);
 		assertThat(ValidadorReserva.validar(r, ctx).orElseThrow().code())
 				.isEqualTo(CodigoError.MENOR_SIN_RESPONSABLE);
 
-		titular.contacto("Luis Pérez", "CO", "3157654321", "Madre");
+		titular.contacto("LUIS PEREZ", "CO", "3157654321", "Madre");
 		r = new NuevaReserva(titular.build(), "Z", acompanante, List.of("x"), hotelMalo, "x", null);
 		assertThat(ValidadorReserva.validar(r, ctx).orElseThrow().code()).isEqualTo(CodigoError.TALLA_INVALIDA);
 

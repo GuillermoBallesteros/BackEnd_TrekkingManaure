@@ -33,6 +33,9 @@ administrador/   Administrador, AdministradorRepository, AdministradorInicialRun
 auditoria/       Auditoria, AuditoriaRepository, AuditoriaService
 api/             controladores (PublicoController, AdminController, AuthController) y dto/ (records
                  con los nombres del front) + mapeadores dominio -> JSON
+notificacion/    avisos por correo (HU-N15, §18): TipoAviso, Aviso, DecisorAvisos y FormatoAviso (puros),
+                 EnvioAviso, EnvioAvisoRepository, RegistroEnvios, PropiedadesBrevo, ClienteBrevo,
+                 ServicioAvisos, RecordatorioPagoService, RecordatorioPagoTask, AvisoRevisionListener
 ```
 Las reglas de `regla/` no dependen de JPA ni de Spring: reciben datos y devuelven el primer error (`Optional<ErrorRegla>` con `code`, `detail`, `campo`), como las funciones de `validaciones.ts`. Se prueban con las mismas tablas de casos del front.
 
@@ -44,12 +47,12 @@ Sembrados con los valores de `shared/reservas/data/catalogos.ts`; el servicio va
 
 | Tabla | Columnas |
 |---|---|
-| `tipo_documento` | `clave VARCHAR(20) PK` (CC, CE, TI, RC, Pasaporte, PPT); `patron VARCHAR(40) NOT NULL` (regex sin anclas, p. ej. `[0-9]{6,10}`); `ayuda VARCHAR(60) NOT NULL`; `edad_min SMALLINT NULL`; `edad_max SMALLINT NULL`; `orden SMALLINT NOT NULL` |
+| `tipo_documento` | `clave VARCHAR(20) PK` (CC, CE, TI, RC, Pasaporte, PPT); `patron VARCHAR(40) NOT NULL` (regex sin anclas, p. ej. `[1-9][0-9]{7,9}` para la CC); `ayuda VARCHAR(60) NOT NULL`; `edad_min SMALLINT NULL`; `edad_max SMALLINT NULL`; `orden SMALLINT NOT NULL` |
 | `genero` | `clave VARCHAR(30) PK` (Femenino, Masculino, Otro, Prefiero no decirlo); `orden` |
 | `talla` | `clave VARCHAR(5) PK` (XS, S, M, L, XL, XXL, XXXL); `orden` |
 | `estadia` | `clave VARCHAR(30) PK` (Páramo, Hotel en Manaure, Regreso a casa); `ocupa_cupo BOOLEAN NOT NULL` (solo Páramo = true); `orden` |
 | `extra` | `clave VARCHAR(30) PK` (cuatrimoto, parapente, parapenteAcompanante); `etiqueta VARCHAR(60) NOT NULL`; `requiere_acompanante BOOLEAN NOT NULL` (solo parapenteAcompanante); `orden` |
-| `eps` | `clave VARCHAR(60) PK` (25 valores); `pide_nombre BOOLEAN NOT NULL` (solo Otra); `orden` |
+| `eps` | `clave VARCHAR(60) PK` (29 valores desde V18); `pide_nombre BOOLEAN NOT NULL` (solo Otra); `orden` |
 | `parentesco` | `clave VARCHAR(40) PK` (11 valores); `es_responsable_legal BOOLEAN NOT NULL` (Madre, Padre, Tutor legal o acudiente); `orden` |
 | `pais_telefono` | `iso CHAR(2) PK`; `nombre VARCHAR(40)`; `indicativo VARCHAR(4)`; `ejemplo VARCHAR(20)`; `movil_largos SMALLINT[] NOT NULL`; `movil_inicios VARCHAR(3)[] NOT NULL`; `fijo_largos SMALLINT[] NULL`; `fijo_inicios VARCHAR(3)[] NULL`; `orden`; CHECK `(fijo_largos IS NULL) = (fijo_inicios IS NULL)` |
 
@@ -107,17 +110,17 @@ Los precios >= 0 por CHECK. Solo el panel cambia `cupos_paramo` y `fecha_cierre`
 | Columna | Tipo | Restricción |
 |---|---|---|
 | id | BIGINT IDENTITY PK | |
-| nombres, apellidos | VARCHAR(60) NOT NULL | |
+| nombres, apellidos | VARCHAR(60) NOT NULL | (V18) CHECK longitud 2 a 40 y `~ '^[A-ZÑ]+([ ''-][A-ZÑ]+)*$'` (MAYÚSCULAS, sin tildes salvo la Ñ) |
 | tipo_documento | VARCHAR(20) NOT NULL | FK tipo_documento |
-| documento | VARCHAR(20) NOT NULL | CHECK `~ '^[A-Z0-9]{5,20}$'`; guardado en mayúsculas; índice (no único) |
+| documento | VARCHAR(20) NOT NULL | CHECK `~ '^[A-Z0-9]{5,20}$'` y (V18) CHECK por tipo: CC `^[1-9][0-9]{7,9}$`, TI `^[0-9]{10,11}$`, RC `^[0-9]{10}$`, CE `^[0-9]{6,10}$`, PPT `^[0-9]{5,8}$`, Pasaporte `^[A-Z0-9]{6,12}$`; guardado sin separadores y en mayúsculas; índice (no único) |
 | fecha_nacimiento | DATE NOT NULL | |
 | genero | VARCHAR(30) NOT NULL | FK genero |
 | telefono_pais | CHAR(2) NOT NULL | FK pais_telefono |
 | telefono_numero | VARCHAR(15) NOT NULL | CHECK `~ '^[0-9]{7,15}$'` |
-| correo | VARCHAR(254) NOT NULL | CHECK `correo = lower(correo)` |
-| ciudad | VARCHAR(60) NOT NULL | |
+| correo | VARCHAR(254) NOT NULL | CHECK `correo = lower(correo)` y (V18) CHECK longitud <= 100 |
+| ciudad | VARCHAR(60) NOT NULL | (V18) CHECK longitud 3 a 40 y solo letras A-Za-zÑñ con puntos de abreviatura, apóstrofe, guion y espacio (sin tildes) |
 | eps | VARCHAR(60) NOT NULL | FK eps |
-| eps_otra | VARCHAR(60) NULL | CHECK `(eps = 'Otra') = (eps_otra IS NOT NULL)` |
+| eps_otra | VARCHAR(60) NULL | CHECK `(eps = 'Otra') = (eps_otra IS NOT NULL)` y (V18) CHECK longitud 3 a 40, solo letras y espacios |
 | creado_en | TIMESTAMPTZ NOT NULL DEFAULT now() | |
 
 **ficha_salud** (1:1, `persona_id` PK y FK; los detalles van cifrados)
@@ -128,7 +131,7 @@ Los precios >= 0 por CHECK. Solo el panel cambia `cupos_paramo` y `fecha_cierre`
 | enfermedad_cifrada, alergias_cifrada, discapacidad_cifrada | TEXT NULL | `AttributeConverter` AES-256-GCM (sección 10.4); CHECK cada bandera = (columna IS NOT NULL) |
 | practica_deporte | BOOLEAN NOT NULL | |
 
-**contacto_emergencia** (1:1): `persona_id BIGINT PK FK`; `nombre VARCHAR(120) NOT NULL`; `telefono_pais CHAR(2) NOT NULL FK pais_telefono`; `telefono_numero VARCHAR(15) NOT NULL` (CHECK dígitos); `parentesco VARCHAR(40) NOT NULL FK parentesco`.
+**contacto_emergencia** (1:1): `persona_id BIGINT PK FK`; `nombre VARCHAR(120) NOT NULL` (V18: CHECK longitud 5 a 80 y MAYÚSCULAS sin tildes); `telefono_pais CHAR(2) NOT NULL FK pais_telefono`; `telefono_numero VARCHAR(15) NOT NULL` (CHECK dígitos); `parentesco VARCHAR(40) NOT NULL FK parentesco`.
 
 **consentimiento_persona** (1:1): `persona_id BIGINT PK FK`; `version_terminos VARCHAR(30) NOT NULL`; `aceptado_en TIMESTAMPTZ NOT NULL`; `uso_imagen BOOLEAN NOT NULL`; `compromiso_areas_protegidas BOOLEAN NOT NULL CHECK (true)`; `compromiso_medio_ambiente BOOLEAN NOT NULL CHECK (true)`.
 
@@ -200,6 +203,23 @@ Los precios >= 0 por CHECK. Solo el panel cambia `cupos_paramo` y `fecha_cierre`
 | detalle | VARCHAR(300) NULL | solo datos no personales: transición `POR_REVISAR>APROBADO`, monto, valor anterior y nuevo de capacidad o fecha. **Nunca** salud, nombres, documentos ni el texto libre del motivo |
 | fecha | TIMESTAMPTZ NOT NULL DEFAULT now() | |
 
+### 3.7 envio_aviso (V19)
+Un aviso por correo ya reclamado para una inscripción (HU-N15). La restricción única es la idempotencia: la `idempotencyKey` de Brevo dura 30 minutos y no basta.
+
+| Columna | Tipo | Restricción |
+|---|---|---|
+| id | BIGINT IDENTITY PK | |
+| inscripcion_id | BIGINT NOT NULL | FK `ON DELETE CASCADE` |
+| tipo | VARCHAR(20) NOT NULL | CHECK IN (PAGO_3_DIAS, PAGO_1_DIA, PAGO_HOY, PAGO_VENCIDO, PAGO_APROBADO, PAGO_RECHAZADO, EVENTO_MANANA) |
+| referencia | VARCHAR(40) NOT NULL | fecha compromiso (`2026-11-09`), código del pago (`PAG-0007`) o víspera y rol (`2026-11-14/TITULAR`) |
+| estado | VARCHAR(10) NOT NULL | CHECK IN (PENDIENTE, ENVIADO, FALLIDO) |
+| intentos | INT NOT NULL DEFAULT 1 | CHECK >= 1 |
+| mensaje_id | VARCHAR(120) NULL | `messageId` de Brevo |
+| creado_en | TIMESTAMPTZ NOT NULL DEFAULT now() | |
+| actualizado_en | TIMESTAMPTZ NOT NULL DEFAULT now() | |
+
+UNIQUE (`inscripcion_id`, `tipo`, `referencia`). No guarda correos ni nombres.
+
 ## 4. Migraciones Flyway
 Las V1 a V8 ya están aplicadas y no se editan. La V9 las deja sin efecto sobre el modelo de negocio.
 
@@ -214,6 +234,8 @@ Las V1 a V8 ya están aplicadas y no se editan. La V9 las deja sin efecto sobre 
 | `V15__crear_auditoria.sql` | `auditoria` |
 | `V16__crear_intento_login.sql` | `intento_login` (fallos de login por IP y correo, §10.2) |
 | `V17__caducidad_pago_y_alertas.sql` | `pago.en_revision_desde` (backfill con `creado_en`, default `now()`, NOT NULL) con su índice parcial, y el CHECK `ck_auditoria_accion` ampliado con `RECHAZO_AUTOMATICO` y `ALERTA_RESERVAS_IP` (H4) |
+| `V19__crear_envio_aviso.sql` | `envio_aviso` (§3.7): avisos por correo reclamados, con UNIQUE (inscripción, tipo, referencia) (HU-N15) |
+| `V18__ajustar_validaciones_formulario.sql` | validaciones del formulario: catálogo `tipo_documento` (CC 8 a 10 dígitos sin cero inicial, PPT 5 a 8 dígitos, pasaporte 6 a 12), fijos de Colombia `601`, `602`, `604` a `608`, cuatro EPS nuevas (Salud Mía, SOS, EPS Familiar de Colombia, AIC) con las opciones especiales al final, conversión de los datos existentes a la forma normalizada y CHECK de longitud y caracteres en `persona` y `contacto_emergencia` |
 
 Si una migración posterior cambia un catálogo (p. ej. nueva EPS) se agrega con `INSERT`; la app no cambia.
 
@@ -376,7 +398,7 @@ El estado derivado no viaja: el front lo calcula con `getStatus`. Los catálogos
 Port de `validateNewRegistration`; devuelve el **primer** error. Los números son el orden de ejecución.
 1. Estructura (400 `DATOS_INVALIDOS`): JSON válido; objetos obligatorios presentes (`phone`, `eps`, `emergencyContact`, `health`, `commitments`, `consent`, `extras`, `plan`); tipos correctos (texto, booleano, lista).
 2. Cierre: `hoy > fecha_cierre` → 409 `INSCRIPCIONES_CERRADAS`.
-3. Titular (`validatePerson`, `quien = participante`), en este orden: nombres y apellidos; fecha de nacimiento (válida, no futura, edad <= 110); documento (tipo del catálogo, patrón del tipo, edad mínima y máxima del tipo); género; teléfono (país del catálogo, solo dígitos, celular válido del país); correo (formato, dominios errados); ciudad; EPS (en catálogo; con `Otra` nombre 3 a 60; si no, nulo); contacto de emergencia (nombre de 5 a 120 con al menos dos palabras; distinto del nombre de la persona; teléfono celular o fijo válido; teléfono distinto al de la persona; parentesco en catálogo); salud (detalles de 2 a 200 caracteres sin espacios en los extremos o nulos; `exercises` booleano); compromisos (`protectedAreas`, luego `environment`); consentimiento (`acceptedAt` fecha válida, versión vigente, `imageUse` booleano); estadía en catálogo.
+3. Titular (`validatePerson`, `quien = participante`), en este orden: nombres y apellidos; fecha de nacimiento (válida, no futura, edad <= 110); documento (tipo del catálogo, patrón del tipo, edad mínima y máxima del tipo); género; teléfono (país del catálogo, solo dígitos, celular válido del país); correo (formato, dominios errados); ciudad; EPS (en catálogo; con `Otra` nombre de 3 a 40 letras y espacios; si no, nulo); contacto de emergencia (nombre de 5 a 80 con al menos dos palabras; distinto del nombre de la persona; teléfono celular o fijo válido; teléfono distinto al de la persona; parentesco en catálogo); salud (detalles de 2 a 200 caracteres sin espacios en los extremos o nulos; `exercises` booleano); compromisos (`protectedAreas`, luego `environment`); consentimiento (`acceptedAt` fecha válida, versión vigente, `imageUse` booleano); estadía en catálogo.
 4. Titular menor: parentesco del contacto debe ser responsable legal → `MENOR_SIN_RESPONSABLE`.
 5. Talla del titular en catálogo → `TALLA_INVALIDA`.
 6. Extras: todos en catálogo; sin repetidos; `parapenteAcompanante` solo con acompañante.
@@ -386,7 +408,7 @@ Port de `validateNewRegistration`; devuelve el **primer** error. Los números so
 10. Documentos duplicados (bajo bloqueo): titular y luego acompañante contra inscripciones activas (RN-06) → 409 `DOCUMENTO_DUPLICADO`.
 11. Cupo del páramo (bajo bloqueo): personas con estadía `Páramo` frente a disponibles → 409 `SIN_CUPO_PARAMO`.
 
-Normalización previa: el documento se valida tal como llega y se guarda en mayúsculas; el correo se pasa a minúsculas antes de validar [SUPUESTO]; no se recortan espacios (los patrones los rechazan, como en el front). Los valores de catálogo se reciben como texto, nunca como `enum`, para devolver el mensaje del front y no un 400 genérico.
+Normalización previa (`Normalizador`, aplicada por `ReservaMapper` antes de validar; V18 y `flujo-app.md` §5): nombres, apellidos y nombre del contacto en MAYÚSCULAS y sin tildes (la Ñ se conserva); ciudad y EPS "Otra" sin tildes; documento sin puntos, espacios ni guiones y en mayúsculas; teléfonos solo con dígitos y sin indicativo; correo en minúsculas y sin espacios; espacios dobles a uno y Unicode NFC en todo texto. Los detalles de salud no se normalizan. Los patrones y los CHECK de la base se aplican al valor ya normalizado. Los valores de catálogo se reciben como texto, nunca como `enum`, para devolver el mensaje del front y no un 400 genérico.
 
 ## 9. Concurrencia
 - **Bloqueo global (`configuracion_evento`)**: `SELECT ... FROM configuracion_evento WHERE id = 1 FOR UPDATE` (`@Lock(PESSIMISTIC_WRITE)`). Lo toman, en este orden de adquisición y siempre primero: crear reserva, aprobar un pago, devolver un pago a "Por revisar" o rechazarlo cuando la inscripción estaba Rechazada, pago manual y cambio de capacidad. Serializa la comprobación de **cupo** y de **documento duplicado** (volumen bajo). `jakarta.persistence.lock.timeout` = 5 s [SUPUESTO] → 409 `RECURSO_OCUPADO` si vence.
@@ -445,7 +467,7 @@ Normalización previa: el documento se valida tal como llega y se guarda en may�
 |---|---|---|
 | 400 | DATOS_INVALIDOS | "Los datos enviados están incompletos o tienen un formato inválido." [SUPUESTO] |
 | 409 | INSCRIPCIONES_CERRADAS | "Las inscripciones cerraron el {d de MMMM}." (p. ej. "9 de noviembre") |
-| 422 | NOMBRE_INVALIDO | "Escribe nombres y apellidos {de} solo con letras (2 a 60 caracteres)." |
+| 422 | NOMBRE_INVALIDO | "Escribe nombres y apellidos {de} solo con letras (2 a 40 caracteres)." |
 | 422 | FECHA_NACIMIENTO_INVALIDA | "Revisa la fecha de nacimiento {de}." |
 | 422 | TIPO_DOCUMENTO_INVALIDO | "Elige un tipo de documento válido {de}." |
 | 422 | DOCUMENTO_INVALIDO | "El documento {de} no es válido: {ayuda del tipo en minúsculas}." |
@@ -517,6 +539,10 @@ Normalización previa: el documento se valida tal como llega y se guarda en may�
 | COOKIE_SECURE | atributo `Secure` de la cookie | por defecto `true` |
 | APP_RATE_LIMIT_* | límites por IP | opcional; valores en §10.2 |
 | RESERVAS_POR_IP_POR_DIA | `app.rate-limit.reservas-por-ip-por-dia` (H4) | por defecto 20 |
+| BREVO_ACTIVO | `app.brevo.activo` (HU-N15) | por defecto `false`; en `true` exige `BREVO_API_KEY` |
+| BREVO_API_KEY | clave v3 de Brevo (`xkeysib-...`) | secreto; solo en `.env` |
+| BREVO_REMITENTE_CORREO, BREVO_REMITENTE_NOMBRE | remitente verificado en Brevo | por defecto `manaureecoturisticointernacional@manaurevive.com` y `ManaureVive` |
+| BREVO_PLANTILLA_* | id de la plantilla por tipo (`PAGO_3_DIAS`, `PAGO_1_DIA`, `PAGO_HOY`, `PAGO_VENCIDO`, `PAGO_APROBADO`, `PAGO_RECHAZADO`, `EVENTO_MANANA`) | 0 = tipo apagado |
 | CADUCIDAD_RESERVAS_ACTIVA, CADUCIDAD_RESERVAS_HORAS | `app.reservas.caducidad.activa` / `.horas` (H4) | por defecto `true` y 12; cron `app.reservas.caducidad.cron` (cada 10 min) |
 
 `.env.example` se actualiza sin secretos; `.env` sigue en `.gitignore`.
@@ -535,6 +561,7 @@ Sin tocar pantallas ni lógica de negocio. El front sigue calculando y validando
 - Unitarias de `regla/` con tablas de casos tomadas de las funciones del front (cada mensaje de la sección 12 tiene un caso).
 - Integración con Testcontainers: registro público feliz y cada error; cupos solo con pago aprobado; documento liberado por Rechazado; menores con y sin autorización; revisión (aprobar, rechazar con motivo, deshacer) y pago manual; capacidad y fecha de cierre; concurrencia (dos reservas por el último cupo del páramo; dos aprobaciones simultáneas; mismo documento en paralelo); autenticación completa (login, bloqueo, refresh con rotación, reutilización revoca la familia, logout, cabecera obligatoria); CORS con credenciales; rate limit; perfil `prod`; Actuator.
 - Privacidad: el valor en `ficha_salud` no contiene el texto original; ningún dato de salud en los logs ni en la auditoría.
+- Avisos (HU-N15): unitarias de `DecisorAvisos` y `FormatoAviso`; `ClienteBrevo` contra `MockRestServiceServer` (cabeceras, cuerpo, reintentos); integración con Testcontainers y `ClienteBrevo` simulado (recordatorios por fecha, idempotencia, aprobación y rechazo tras el commit, revisión fallida sin correo, víspera del evento, logs sin datos personales).
 - Contrato: cargas JSON generadas del front (`buildNewRegistration`) aceptadas y respuestas que cumplen `Registration`.
 
 ## 16. Decisiones y supuestos pendientes de confirmar
@@ -568,3 +595,14 @@ Cada punto es una pregunta concreta. El diseño asume la respuesta marcada con *
 - Pregunta 1: un acompañante menor se acepta con las reglas generales, igual que el front (solo el titular menor exige responsable y autorización).
 - Pregunta 5/6/21/22: precios estáticos en el front (`shared/config`) con los mismos valores sembrados en la base; solo cupos y fecha de cierre se editan desde el panel.
 - Resto (2-4, 7-20): se aplica la opción por defecto indicada en cada punto del §16.
+
+
+## 18. Avisos por correo con Brevo (HU-N15, RN-24)
+- **Activación**: `app.brevo.activo` (`BREVO_ACTIVO`, por defecto `false`). Apagado, no existen el cliente, la tarea ni el listener: nada se envía ni se registra. Encendido sin `BREVO_API_KEY`, la API no arranca.
+- **Decisión pura** (`DecisorAvisos`, sin Spring): con el estado derivado (§5), la fecha compromiso, la fecha de inicio del evento y `hoy` devuelve los avisos que tocan hoy. `Saldo pendiente` con compromiso a 3, 1 o 0 días: `PAGO_3_DIAS`, `PAGO_1_DIA`, `PAGO_HOY` (referencia = fecha compromiso). `Vencido` con compromiso = ayer: `PAGO_VENCIDO`. `Pagado` y `hoy` = víspera del evento: `EVENTO_MANANA` por persona (referencia = víspera y rol). Una revisión `APROBADO` o `RECHAZADO` da `PAGO_APROBADO` o `PAGO_RECHAZADO` (referencia = código del pago); `POR_REVISAR` no da nada.
+- **Tarea diaria** (`RecordatorioPagoTask`): `@Scheduled(cron = "${app.brevo.cron:0 0 12 * * *}", zone = "America/Bogota")`. Al arrancar, si ya pasaron las 12:00 en Bogotá, corre una vez. Recorre las inscripciones activas por lotes (paginación por id, `app.brevo.lote`), cada una aislada: un fallo se registra (código y clase) y no frena a las demás.
+- **Revisión de pagos**: `RevisionPagoService` (revisar y caducidad) y `PagoManualService` publican `PagoRevisadoEvent(codigoPago, revision)`. `AvisoRevisionListener` lo atiende con `@TransactionalEventListener(phase = AFTER_COMMIT)`: si la transacción se revierte, no sale correo. Los datos se releen en una transacción nueva. El envío va a un hilo propio (uno solo, que conserva el orden) para que la respuesta del panel nunca espere a Brevo; al cerrar la API espera hasta 30 s a los avisos encolados.
+- **Reclamo y envío** (`RegistroEnvios`, `REQUIRES_NEW`): `INSERT ... ON CONFLICT DO NOTHING` en `envio_aviso` con estado `PENDIENTE`. Si la fila ya existe solo se reclama otra vez si está `FALLIDA` y con menos de 3 intentos. Después se llama a Brevo fuera de la transacción y se marca `ENVIADO` (con `mensaje_id`) o `FALLIDO`. Una caída entre el reclamo y el envío deja la fila `PENDIENTE`: ese aviso no se repite (como máximo una vez).
+- **Brevo** (`ClienteBrevo`, `RestClient`): `POST {app.brevo.url}/smtp/email` con cabecera `api-key`, cuerpo `{ sender, to, templateId, params, tags }`. 429 y 5xx se reintentan hasta 3 veces con espera creciente; otro error no se reintenta. Tiempo de conexión 5 s y de lectura 10 s.
+- **Plantillas**: un id por tipo en `app.brevo.plantillas.*` (`BREVO_PLANTILLA_*`). Id 0 = tipo apagado (advertencia sin datos personales). Parámetros (`{{ params.x }}`): `nombre`, `codigoReserva`, `total`, `pagado`, `saldo`, `pagoCompleto`, `fechaCompromiso`, `evento`, `fechaEvento` y, en los avisos de un pago, `codigoPago`, `concepto`, `monto` y `motivo`. Montos `$350.000` y fechas `9 de noviembre`. El nombre se pasa con mayúscula inicial (en la base está en mayúsculas sin tildes, §8).
+- **Privacidad**: ni los logs ni `envio_aviso` guardan correos, nombres, documentos ni salud. Los logs solo llevan código de reserva, tipo y conteos.

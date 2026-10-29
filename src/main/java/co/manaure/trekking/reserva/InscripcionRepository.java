@@ -30,6 +30,10 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Long> 
 	List<Inscripcion> candidatasACaducar(@Param("desde") long desde, @Param("limite") java.time.OffsetDateTime limite,
 			org.springframework.data.domain.Pageable lote);
 
+	/** Ids de las inscripciones activas con id mayor que {@code desde}, por id ascendente (avisos, HU-N15). */
+	@Query("select i.id from Inscripcion i where i.activa = true and i.id > :desde order by i.id")
+	List<Long> idsActivas(@Param("desde") long desde, org.springframework.data.domain.Pageable lote);
+
 	/** FOR UPDATE de la fila de la inscripción (diseno §9); se toma después del bloqueo global. */
 	@Lock(LockModeType.PESSIMISTIC_WRITE)
 	@Query("select i from Inscripcion i where i.codigo = :codigo")

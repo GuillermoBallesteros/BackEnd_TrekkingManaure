@@ -89,7 +89,7 @@ class RevisionPagoTest extends ReservaPublicaBase {
 		crearTitular();
 		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk())
 				.andExpect(jsonPath("$.id").value("PER-0001"))
-				.andExpect(jsonPath("$.firstName").value("Ana María"))
+				.andExpect(jsonPath("$.firstName").value("ANA MARIA"))
 				.andExpect(jsonPath("$.payments[0].id").value("PAG-0001"))
 				.andExpect(jsonPath("$.payments[0].review").value("Aprobado"))
 				.andExpect(jsonPath("$.payments[0].rejectionReason").value(nullValue()));

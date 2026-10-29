@@ -9,6 +9,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -49,7 +52,7 @@ class EsquemaRestriccionesTest {
 		return jdbc.queryForObject("""
 				insert into persona (nombres, apellidos, tipo_documento, documento, fecha_nacimiento, genero,
 				    telefono_pais, telefono_numero, correo, ciudad, eps, eps_otra)
-				values ('Maria', 'Perez', 'CC', 'DOC%d', date '1990-05-14', 'Femenino', 'CO', '3001234567',
+				values ('MARIA', 'PEREZ', 'CC', '1%09d', date '1990-05-14', 'Femenino', 'CO', '3001234567',
 				    'maria@example.com', 'Valledupar', 'Nueva EPS', null) returning id""".formatted(n), Long.class);
 	}
 
@@ -88,7 +91,7 @@ class EsquemaRestriccionesTest {
 	void tiposDocumentoSembradosConPatronYEdades() {
 		assertThat(jdbc.queryForObject("select count(*) from tipo_documento", Integer.class)).isEqualTo(6);
 		Map<String, Object> cc = jdbc.queryForMap("select * from tipo_documento where clave = 'CC'");
-		assertThat(cc).containsEntry("patron", "[0-9]{6,10}");
+		assertThat(cc).containsEntry("patron", "[1-9][0-9]{7,9}").containsEntry("ayuda", "Entre 8 y 10 dígitos");
 		assertThat(num(cc, "edad_min")).isEqualTo(18);
 		assertThat(cc.get("edad_max")).isNull();
 		Map<String, Object> ti = jdbc.queryForMap("select * from tipo_documento where clave = 'TI'");
@@ -115,7 +118,12 @@ class EsquemaRestriccionesTest {
 		assertThat(jdbc.queryForObject("select count(*) from extra", Integer.class)).isEqualTo(3);
 		assertThat(jdbc.queryForList("select clave from extra where requiere_acompanante", String.class))
 				.containsExactly("parapenteAcompanante");
-		assertThat(jdbc.queryForObject("select count(*) from eps", Integer.class)).isEqualTo(25);
+		assertThat(jdbc.queryForObject("select count(*) from eps", Integer.class)).isEqualTo(29);
+		assertThat(jdbc.queryForList("select clave from eps order by orden desc limit 3", String.class))
+				.containsExactly("No tengo EPS", "Otra", "Régimen especial o de excepción");
+		assertThat(jdbc.queryForList("select clave from eps where orden between 23 and 26 order by orden",
+				String.class)).containsExactly("Salud Mía", "SOS (Servicio Occidental de Salud)",
+						"EPS Familiar de Colombia", "AIC (Asociación Indígena del Cauca)");
 		assertThat(jdbc.queryForList("select clave from eps where pide_nombre", String.class)).containsExactly("Otra");
 		assertThat(jdbc.queryForObject("select count(*) from parentesco", Integer.class)).isEqualTo(11);
 		assertThat(jdbc.queryForList("select clave from parentesco where es_responsable_legal order by orden",
@@ -131,11 +139,139 @@ class EsquemaRestriccionesTest {
 				select indicativo, movil_largos::text as ml, movil_inicios::text as mi, fijo_largos::text as fl,
 				       fijo_inicios::text as fi from pais_telefono where iso = 'CO'""");
 		assertThat(co).containsEntry("indicativo", "57").containsEntry("ml", "{10}").containsEntry("mi", "{3}")
-				.containsEntry("fl", "{10}").containsEntry("fi", "{60}");
+				.containsEntry("fl", "{10}").containsEntry("fi", "{601,602,604,605,606,607,608}");
 		assertThat(jdbc.queryForObject("select movil_largos::text from pais_telefono where iso = 'AR'", String.class))
 				.isEqualTo("{10,11}");
 		assertThat(jdbc.queryForObject("select movil_inicios::text from pais_telefono where iso = 'DO'", String.class))
 				.isEqualTo("{809,829,849}");
+	}
+
+	// ---------- validaciones del formulario (V18): restricciones sobre el valor ya normalizado ----------
+
+	private void insertarPersonaCon(String nombres, String apellidos, String tipo, String documento, String correo,
+			String ciudad, String eps, String epsOtra) {
+		jdbc.update("""
+				insert into persona (nombres, apellidos, tipo_documento, documento, fecha_nacimiento, genero,
+				    telefono_pais, telefono_numero, correo, ciudad, eps, eps_otra)
+				values (?, ?, ?, ?, date '1990-05-14', 'Femenino', 'CO', '3001234567', ?, ?, ?, ?)""", nombres,
+				apellidos, tipo, documento, correo, ciudad, eps, epsOtra);
+	}
+
+	private void insertarPersonaValidaCon(String nombres, String apellidos, String ciudad) {
+		insertarPersonaCon(nombres, apellidos, "CC", "1" + String.format("%09d", CONTADOR.incrementAndGet()),
+				"maria@example.com", ciudad, "Nueva EPS", null);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "MARIA JOSE", "MUÑOZ PEÑA", "D'ANGELO", "ANA-LUCIA", "JO" })
+	void nombresNormalizadosSeAceptan(String nombre) {
+		insertarPersonaValidaCon(nombre, "PEREZ", "Valledupar");
+		insertarPersonaValidaCon("MARIA", nombre, "Valledupar");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Maria", "MARÍA", "A", "ANA2", "ANA  MARIA", " ANA", "ANA-", "ANA--MARIA", "ИВАН" })
+	void nombresSinNormalizarSeRechazan(String nombre) {
+		assertThatThrownBy(() -> insertarPersonaValidaCon(nombre, "PEREZ", "Valledupar"))
+				.isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("ck_persona_nombres");
+		assertThatThrownBy(() -> insertarPersonaValidaCon("MARIA", nombre, "Valledupar"))
+				.isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("ck_persona_apellidos");
+	}
+
+	@Test
+	void nombresYApellidosAdmitenHasta40Caracteres() {
+		insertarPersonaValidaCon("A".repeat(40), "B".repeat(40), "Valledupar");
+		assertThatThrownBy(() -> insertarPersonaValidaCon("A".repeat(41), "PEREZ", "Valledupar"))
+				.hasMessageContaining("ck_persona_nombres");
+		assertThatThrownBy(() -> insertarPersonaValidaCon("MARIA", "B".repeat(41), "Valledupar"))
+				.hasMessageContaining("ck_persona_apellidos");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Valledupar", "valledupar", "Bogota D.C.", "Sta. Marta", "Ñapinda", "Rio-Hacha", "L'Aquila" })
+	void ciudadesNormalizadasSeAceptan(String ciudad) {
+		insertarPersonaValidaCon("MARIA", "PEREZ", ciudad);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Bogotá", "Ci", "Bogota1", "Sta.. Marta", ".Bogota" })
+	void ciudadesInvalidasSeRechazan(String ciudad) {
+		assertThatThrownBy(() -> insertarPersonaValidaCon("MARIA", "PEREZ", ciudad))
+				.isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("ck_persona_ciudad");
+	}
+
+	@Test
+	void ciudadAdmiteHasta40Caracteres() {
+		insertarPersonaValidaCon("MARIA", "PEREZ", "a".repeat(40));
+		assertThatThrownBy(() -> insertarPersonaValidaCon("MARIA", "PEREZ", "a".repeat(41)))
+				.hasMessageContaining("ck_persona_ciudad");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Medimas", "Salud Vida", "Ñoño Salud" })
+	void epsOtraConSoloLetrasSeAcepta(String otra) {
+		insertarPersonaCon("MARIA", "PEREZ", "CC", "1234567890", "maria@example.com", "Valledupar", "Otra", otra);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Ab", "Salud2", "Sanitas S.A.", "Salud  Vida", "Medimás" })
+	void epsOtraInvalidaSeRechaza(String otra) {
+		assertThatThrownBy(() -> insertarPersonaCon("MARIA", "PEREZ", "CC", "1234567890", "maria@example.com",
+				"Valledupar", "Otra", otra)).isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_persona_eps_otra_texto");
+	}
+
+	@Test
+	void correoAdmiteHasta100Caracteres() {
+		String largo = "a".repeat(100 - "@example.com".length()) + "@example.com";
+		insertarPersonaCon("MARIA", "PEREZ", "CC", "1234567890", largo, "Valledupar", "Nueva EPS", null);
+		assertThatThrownBy(() -> insertarPersonaCon("MARIA", "PEREZ", "CC", "1234567891", "a" + largo, "Valledupar",
+				"Nueva EPS", null)).hasMessageContaining("ck_persona_correo_largo");
+	}
+
+	@ParameterizedTest
+	@CsvSource({ "CC,54876234", "CC,1098726541", "CC,123456789", "TI,1234567890", "TI,12345678901", "RC,1234567890",
+			"CE,123456", "CE,1234567890", "PPT,12345", "PPT,12345678", "Pasaporte,AB1234", "Pasaporte,AB1234567890" })
+	void documentosValidosSegunElTipo(String tipo, String documento) {
+		insertarPersonaCon("MARIA", "PEREZ", tipo, documento, "maria@example.com", "Valledupar", "Nueva EPS", null);
+	}
+
+	@ParameterizedTest
+	@CsvSource({ "CC,1234567", "CC,12345678901", "CC,0123456789", "CC,12AB567890", "TI,123456789", "TI,123456789012",
+			"RC,123456789", "RC,12345678901", "CE,12345", "CE,12345678901", "PPT,123456789", "PPT,AB12345",
+			"Pasaporte,AB123", "Pasaporte,AB12345678901" })
+	void documentosInvalidosSegunElTipoSeRechazan(String tipo, String documento) {
+		assertThatThrownBy(() -> insertarPersonaCon("MARIA", "PEREZ", tipo, documento, "maria@example.com",
+				"Valledupar", "Nueva EPS", null)).isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_persona_documento_tipo");
+	}
+
+	private void insertarContacto(long persona, String nombre) {
+		jdbc.update("""
+				insert into contacto_emergencia (persona_id, nombre, telefono_pais, telefono_numero, parentesco)
+				values (?, ?, 'CO', '3157654321', 'Madre')""", persona, nombre);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "LUIS PEREZ", "LUIS-ANDRES PEÑA RUIZ" })
+	void nombreDelContactoNormalizadoSeAcepta(String nombre) {
+		insertarContacto(insertarPersona(), nombre);
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = { "Luis Perez", "LUIS", "LU P", "LUIS PEREZ2", "LUIS  PEREZ" })
+	void nombreDelContactoSinNormalizarSeRechaza(String nombre) {
+		long persona = insertarPersona();
+		assertThatThrownBy(() -> insertarContacto(persona, nombre)).isInstanceOf(DataIntegrityViolationException.class)
+				.hasMessageContaining("ck_contacto_nombre");
+	}
+
+	@Test
+	void nombreDelContactoAdmiteHasta80Caracteres() {
+		insertarContacto(insertarPersona(), "A".repeat(39) + " " + "B".repeat(40));
+		long otra = insertarPersona();
+		assertThatThrownBy(() -> insertarContacto(otra, "A".repeat(40) + " " + "B".repeat(40)))
+				.hasMessageContaining("ck_contacto_nombre");
 	}
 
 	// ---------- configuración ----------

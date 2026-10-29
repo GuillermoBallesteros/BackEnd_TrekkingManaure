@@ -71,6 +71,27 @@ app:
       cron: "0 */10 * * * *"
       # Reservas candidatas leídas por lote; cada una se procesa en su propia transacción.
       lote: 50
+  brevo:
+    # HU-N15 (RN-24): avisos por correo. Apagado por defecto; en true exige BREVO_API_KEY.
+    activo: ${BREVO_ACTIVO:false}
+    api-key: ${BREVO_API_KEY:}
+    url: https://api.brevo.com/v3
+    remitente-correo: ${BREVO_REMITENTE_CORREO:manaureecoturisticointernacional@manaurevive.com}
+    remitente-nombre: ${BREVO_REMITENTE_NOMBRE:ManaureVive}
+    # A las 12:00 en Bogotá; si la API arranca después, corre una vez al quedar lista.
+    cron: "0 0 12 * * *"
+    recuperar-al-arrancar: true
+    lote: 50
+    espera-reintento-ms: 1000
+    # Id de la plantilla de Brevo por tipo de aviso; 0 apaga ese tipo.
+    plantillas:
+      pago-3-dias: ${BREVO_PLANTILLA_PAGO_3_DIAS:0}
+      pago-1-dia: ${BREVO_PLANTILLA_PAGO_1_DIA:0}
+      pago-hoy: ${BREVO_PLANTILLA_PAGO_HOY:0}
+      pago-vencido: ${BREVO_PLANTILLA_PAGO_VENCIDO:0}
+      pago-aprobado: ${BREVO_PLANTILLA_PAGO_APROBADO:0}
+      pago-rechazado: ${BREVO_PLANTILLA_PAGO_RECHAZADO:0}
+      evento-manana: ${BREVO_PLANTILLA_EVENTO_MANANA:0}
   admin:
     correo: ${ADMIN_EMAIL:}
     clave: ${ADMIN_PASSWORD:}

@@ -40,7 +40,7 @@ class ReservaAdminListaTest extends ReservaPublicaBase {
 	}
 
 	private void crear(int n) throws Exception {
-		crear(ReservaJson.conAcompanante().set("document", "10650" + n).set("companion.document", "10659" + n));
+		crear(ReservaJson.conAcompanante().set("document", "1065000" + n).set("companion.document", "1065900" + n));
 	}
 
 	private void crear(ReservaJson r) throws Exception {
@@ -109,8 +109,8 @@ class ReservaAdminListaTest extends ReservaPublicaBase {
 		listar().andExpect(status().isOk())
 				.andExpect(jsonPath("$.registrations[0].id").value("PER-0001"))
 				.andExpect(jsonPath("$.registrations[0].createdAt").value("2026-10-28"))
-				.andExpect(jsonPath("$.registrations[0].firstName").value("Ana María"))
-				.andExpect(jsonPath("$.registrations[0].lastName").value("Pérez Gómez"))
+				.andExpect(jsonPath("$.registrations[0].firstName").value("ANA MARIA"))
+				.andExpect(jsonPath("$.registrations[0].lastName").value("PEREZ GOMEZ"))
 				.andExpect(jsonPath("$.registrations[0].documentType").value("CC"))
 				.andExpect(jsonPath("$.registrations[0].document").isString())
 				.andExpect(jsonPath("$.registrations[0].birthDate").value("1990-05-14"))
@@ -121,7 +121,7 @@ class ReservaAdminListaTest extends ReservaPublicaBase {
 				.andExpect(jsonPath("$.registrations[0].city").value("Valledupar"))
 				.andExpect(jsonPath("$.registrations[0].eps.entity").value("Nueva EPS"))
 				.andExpect(jsonPath("$.registrations[0].eps.other").value(nullValue()))
-				.andExpect(jsonPath("$.registrations[0].emergencyContact.name").value("Luis Pérez"))
+				.andExpect(jsonPath("$.registrations[0].emergencyContact.name").value("LUIS PEREZ"))
 				.andExpect(jsonPath("$.registrations[0].emergencyContact.phone.number").value("3157654321"))
 				.andExpect(jsonPath("$.registrations[0].emergencyContact.relationship").value("Hermano o hermana"))
 				.andExpect(jsonPath("$.registrations[0].commitments.protectedAreas").value(true))
@@ -131,7 +131,7 @@ class ReservaAdminListaTest extends ReservaPublicaBase {
 				.andExpect(jsonPath("$.registrations[0].consent.imageUse").value(true))
 				.andExpect(jsonPath("$.registrations[0].stay").value("Páramo"))
 				.andExpect(jsonPath("$.registrations[0].shirtSize").value("M"))
-				.andExpect(jsonPath("$.registrations[0].companion.firstName").value("Carlos"))
+				.andExpect(jsonPath("$.registrations[0].companion.firstName").value("CARLOS"))
 				.andExpect(jsonPath("$.registrations[0].companion.kit").value(false))
 				.andExpect(jsonPath("$.registrations[0].companion.shirtSize").value(nullValue()))
 				.andExpect(jsonPath("$.registrations[0].extras[0]").value("cuatrimoto"))
@@ -180,7 +180,7 @@ class ReservaAdminListaTest extends ReservaPublicaBase {
 		long conDos = sf.getStatistics().getPrepareStatementCount() - antes;
 
 		for (int i = 3; i <= 50; i++) {
-			crear(ReservaJson.conAcompanante().set("document", "10650" + i).set("companion.document", "10659" + i)
+			crear(ReservaJson.conAcompanante().set("document", "1065000" + i).set("companion.document", "1065900" + i)
 					.set("extras", List.of("cuatrimoto")).set("preEventHotel",
 							Map.of("checkIn", "2026-11-12", "checkOut", "2026-11-14", "withCompanion", true)));
 		}
