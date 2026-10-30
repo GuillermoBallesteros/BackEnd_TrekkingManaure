@@ -15,7 +15,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
- * HU-N01: las migraciones se aplican en orden V1 a V19 sobre una base nueva; V9 retira el modelo anterior
+ * HU-N01: las migraciones se aplican en orden V1 a V21 sobre una base nueva; V9 retira el modelo anterior
  * y las secuencias de códigos arrancan en 1. Usa una base aparte dentro del mismo contenedor.
  */
 @Import(TestcontainersConfiguration.class)
@@ -95,9 +95,9 @@ class MigracionesFlywayTest {
 		// V18 convierte lo existente a la forma normalizada y añade las restricciones nuevas.
 		flyway(null).migrate();
 		assertThat(jdbc.queryForObject("select max(version::int) from flyway_schema_history where success", Integer.class))
-				.isEqualTo(19);
+				.isEqualTo(21);
 		assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where success and version is not null",
-				Integer.class)).isEqualTo(19);
+				Integer.class)).isEqualTo(21);
 		Map<String, Object> convertida = jdbc.queryForMap(
 				"select nombres, apellidos, ciudad, eps_otra, documento, correo from persona where id = ?", persona);
 		assertThat(convertida).containsEntry("nombres", "MARIA JOSE").containsEntry("apellidos", "MUÑOZ PEÑA")
@@ -117,7 +117,7 @@ class MigracionesFlywayTest {
 	void laAplicacionArrancaConValidateSobreElEsquemaCompleto() {
 		// El contexto ya cargó con ddl-auto=validate: si una entidad no coincidiera con la base, no habría arrancado.
 		assertThat(jdbcApp.queryForObject("select max(version::int) from flyway_schema_history where success",
-				Integer.class)).isEqualTo(19);
+				Integer.class)).isEqualTo(21);
 	}
 
 }

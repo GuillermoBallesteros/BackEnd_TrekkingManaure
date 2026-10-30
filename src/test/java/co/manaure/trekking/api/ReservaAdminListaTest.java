@@ -92,9 +92,11 @@ class ReservaAdminListaTest extends ReservaPublicaBase {
 
 	@Test
 	void capacidadFechaCierreYHoyVienenDeConfiguracionYReloj() throws Exception {
-		jdbc.update("update configuracion_evento set cupos_paramo = 75");
+		jdbc.update("update configuracion_evento set cupos_carrera = 75, cupos_paramo = 40");
 		String cierre = jdbc.queryForObject("select fecha_cierre::text from configuracion_evento", String.class);
 		listar().andExpect(jsonPath("$.registrations", hasSize(0))).andExpect(jsonPath("$.capacity").value(75))
+				.andExpect(jsonPath("$.occupied").value(0)).andExpect(jsonPath("$.paramo.capacity").value(40))
+				.andExpect(jsonPath("$.paramo.occupied").value(0)).andExpect(jsonPath("$.paramo.available").value(40))
 				.andExpect(jsonPath("$.fechaCierre").value(cierre)).andExpect(jsonPath("$.today").value("2026-10-28"));
 		// Pasada la medianoche UTC sigue siendo el mismo día en Bogotá.
 		reloj.fijar(Instant.parse("2026-10-29T03:30:00Z"));
@@ -171,6 +173,8 @@ class ReservaAdminListaTest extends ReservaPublicaBase {
 
 	@Test
 	void noHaceN1ConCincuentaReservas() throws Exception {
+		// 50 reservas con acompañante en el páramo: 50 cupos de la carrera y 100 cupos.
+		jdbc.update("update configuracion_evento set cupos_paramo = 100");
 		SessionFactory sf = emf.unwrap(SessionFactory.class);
 		crear(1);
 		crear(2);

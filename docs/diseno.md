@@ -88,10 +88,11 @@ Sembrados con los valores de `shared/reservas/data/catalogos.ts`; el servicio va
 |---|---|---|
 | id | SMALLINT PK | CHECK `id = 1` |
 | nombre_evento | VARCHAR(150) NOT NULL | Trekking Desafío Perijá 13K |
-| fecha_evento_inicio, fecha_evento_fin | DATE NOT NULL | 2026-11-15 / 2026-11-16; CHECK inicio <= fin |
+| fecha_evento_inicio, fecha_evento_fin | DATE NOT NULL | 2026-11-28 / 2026-11-29; CHECK inicio <= fin |
 | fecha_apertura | DATE NOT NULL | 2026-10-28; CHECK < fecha_evento_inicio |
 | fecha_cierre | DATE NOT NULL | 2026-11-09; CHECK >= fecha_apertura y < fecha_evento_inicio |
-| cupos_paramo | INT NOT NULL | 60; CHECK >= 1 |
+| cupos_carrera | INT NOT NULL | 60 (V21); CHECK >= 1; una reserva activa gasta uno |
+| cupos_paramo | INT NOT NULL | 30 cupos (V21); CHECK >= 1; una persona en Páramo gasta una |
 | precio_titular | BIGINT NOT NULL | 350000; CHECK > 0 |
 | valor_apartado | BIGINT NOT NULL | 50000; CHECK > 0 y <= precio_titular |
 | precio_acompanante_sin_kit | BIGINT NOT NULL | 150000 |
@@ -103,7 +104,7 @@ Sembrados con los valores de `shared/reservas/data/catalogos.ts`; el servicio va
 | actualizado_por | BIGINT NULL | FK administrador, índice |
 | actualizado_en | TIMESTAMPTZ NULL | |
 
-Los precios >= 0 por CHECK. Solo el panel cambia `cupos_paramo` y `fecha_cierre`; precios y versión de términos se cambian por migración [SUPUESTO]. `kitCompleto` (300.000) no se guarda: es `precio_titular - valor_apartado`.
+Los precios >= 0 por CHECK. Solo el panel cambia `cupos_carrera`, `cupos_paramo` y `fecha_cierre`; precios y versión de términos se cambian por migración [SUPUESTO]. `kitCompleto` (300.000) no se guarda: es `precio_titular - valor_apartado`.
 
 ### 3.4 Personas (V13)
 **persona**: identidad y contacto. Una fila por persona por inscripción (no se reutiliza entre inscripciones).
@@ -211,7 +212,7 @@ Un aviso por correo ya reclamado para una inscripción (HU-N15). La restricción
 | id | BIGINT IDENTITY PK | |
 | inscripcion_id | BIGINT NOT NULL | FK `ON DELETE CASCADE` |
 | tipo | VARCHAR(20) NOT NULL | CHECK IN (PAGO_3_DIAS, PAGO_1_DIA, PAGO_HOY, PAGO_VENCIDO, PAGO_APROBADO, PAGO_RECHAZADO, EVENTO_MANANA) |
-| referencia | VARCHAR(40) NOT NULL | fecha compromiso (`2026-11-09`), código del pago (`PAG-0007`) o víspera y rol (`2026-11-14/TITULAR`) |
+| referencia | VARCHAR(40) NOT NULL | fecha compromiso (`2026-11-09`), código del pago (`PAG-0007`) o víspera y rol (`2026-11-27/TITULAR`) |
 | estado | VARCHAR(10) NOT NULL | CHECK IN (PENDIENTE, ENVIADO, FALLIDO) |
 | intentos | INT NOT NULL DEFAULT 1 | CHECK >= 1 |
 | mensaje_id | VARCHAR(120) NULL | `messageId` de Brevo |
@@ -245,12 +246,13 @@ Si una migración posterior cambia un catálogo (p. ej. nueva EPS) se agrega con
 - **pagado** = Σ monto de pagos `APROBADO`. **saldo** = `max(0, total - pagado)`.
 - **estado derivado** (orden): `pagado > 0 y pagado >= total` → Pagado; `pagado > 0` → (`fecha_compromiso != null y fecha_compromiso < hoy` ? Vencido : Saldo pendiente); sin pagos o con alguno `POR_REVISAR` → Por verificar; si no → Rechazado. `hoy` = fecha en Bogotá.
 - **activa** = estado != Rechazado.
-- **cupos ocupados** = personas con `estadia.ocupa_cupo` en inscripciones con al menos un pago `APROBADO`. **disponibles** = `max(0, cupos_paramo - ocupados)`. Consulta:
+- **cupos de la carrera ocupados** = inscripciones con `activa = true`. **disponibles** = `max(0, cupos_carrera - ocupados)`.
+- **cupos del páramo ocupados** = personas con `estadia.ocupa_cupo` en inscripciones activas (se apartan al crear la reserva, aunque el pago siga `POR_REVISAR`). **disponibles** = `max(0, cupos_paramo - ocupadas)`. Consulta:
   ```sql
   SELECT count(*) FROM inscripcion_participante ip
+  JOIN inscripcion i ON i.id = ip.inscripcion_id AND i.activa
   JOIN estadia e ON e.clave = ip.estadia AND e.ocupa_cupo
-  WHERE EXISTS (SELECT 1 FROM pago p WHERE p.inscripcion_id = ip.inscripcion_id AND p.revision = 'APROBADO')
-    AND ip.inscripcion_id <> :excluir   -- solo al aprobar, con :excluir = -1 en los demás casos
+  WHERE ip.inscripcion_id <> :excluir   -- la reserva que se reactiva; -1 en los demás casos
   ```
 - **primer día elegible** = `max(hoy, fecha_apertura)`. **Ventana de hotel**: `lastCheckOut = fecha_evento_inicio`; `firstCheckIn = primer día elegible`; `lastCheckIn = lastCheckOut - 1`; disponible si `firstCheckIn <= lastCheckIn`; `firstCheckOut = firstCheckIn + 1`.
 - **edad** = años cumplidos a `hoy` (no al día del evento, igual que el front). **menor** = edad < 18 con fecha válida.
@@ -295,7 +297,7 @@ Todas las respuestas son JSON UTF-8. Fechas `AAAA-MM-DD`; instantes ISO-8601 UTC
   "total": 500000
 }
 ```
-`companion` es una `Person` aplanada más `kit` (boolean) y `shirtSize` (talla o `null`). `preEventHotel` es `{ "checkIn": "2026-11-12", "checkOut": "2026-11-14", "withCompanion": true }` o `null`. `total` es un campo **adicional** (el front calcula el suyo con `getTotal`; TypeScript lo ignora): el total guardado por el servidor con los precios aplicados [SUPUESTO].
+`companion` es una `Person` aplanada más `kit` (boolean) y `shirtSize` (talla o `null`). `preEventHotel` es `{ "checkIn": "2026-11-12", "checkOut": "2026-11-27", "withCompanion": true }` o `null`. `total` es un campo **adicional** (el front calcula el suyo con `getTotal`; TypeScript lo ignora): el total guardado por el servidor con los precios aplicados [SUPUESTO].
 
 `NewRegistration` (entrada) = `Registration` sin `id`, `createdAt`, `payments`, `guardianAuthorized` (y sin `total`, que se ignora). Todos los campos son obligatorios salvo los nulables del tipo.
 
@@ -309,7 +311,7 @@ Todas las respuestas son JSON UTF-8. Fechas `AAAA-MM-DD`; instantes ISO-8601 UTC
 `GET /api/v1/config`:
 ```json
 {
-  "evento": { "nombre": "Trekking Desafío Perijá 13K", "fechas": ["2026-11-15", "2026-11-16"],
+  "evento": { "nombre": "Trekking Desafío Perijá 13K", "fechas": ["2026-11-28", "2026-11-29"],
               "fechaAperturaInscripciones": "2026-10-28", "fechaCierre": "2026-11-09" },
   "precios": { "moneda": "COP", "total": 350000, "inscripcion": 50000, "kitCompleto": 300000,
                "acompanante": 150000, "acompananteConKit": 350000, "cuatrimoto": 150000,
@@ -321,9 +323,11 @@ Las claves reflejan `shared/config` (`evento`, `precios`) [SUPUESTO sobre la for
 
 `GET /api/v1/disponibilidad`:
 ```json
-{ "capacity": 60, "occupied": 12, "available": 48, "fechaCierre": "2026-11-09", "today": "2026-10-28" }
+{ "capacity": 60, "occupied": 10, "available": 50,
+  "paramo": { "capacity": 30, "occupied": 12, "available": 18 },
+  "fechaCierre": "2026-11-09", "today": "2026-10-28" }
 ```
-`occupied` y `available` siguen RN-04. `today` es la fecha de Bogotá en el servidor.
+`capacity`, `occupied` y `available` son los cupos de la carrera; `paramo`, los cupos del páramo (RN-04). `today` es la fecha de Bogotá en el servidor.
 
 `POST /api/v1/reservas` valida en el orden de la sección 8 y, si pasa, crea todo en una transacción (persona, ficha cifrada, contacto, consentimiento con `aceptado_en = ahora` del servidor, participantes, extras, hotel, primer pago `POR_REVISAR`). Responde 201 con la `Registration` completa (con salud, como el front la guarda).
 
@@ -353,12 +357,12 @@ Cookie de refresh: `Set-Cookie: refresh_token=<token>; Path=/api/v1/auth; HttpOn
 | POST | `/reservas/{id}/pagos` | `{ "amount": 100000 }` | `Payment` | 201, 401, 404, 409, 422 |
 | PUT | `/pagos/{id}/revision` | `{ "review": "Rechazado", "reason": "..." }` | `Registration` | 200, 400, 401, 404, 409, 422 |
 | PUT | `/reservas/{id}/autorizacion-menor` | `{ "received": true }` | `Registration` | 200, 400, 401, 404 |
-| PUT | `/capacidad` | `{ "capacity": 80 }` | `{ "capacity": 80 }` | 200, 401, 422 |
+| PUT | `/capacidad` | `{ "capacity": 70, "paramo": 40 }` | `{ "capacity": 70, "paramo": 40 }` | 200, 401, 422 |
 | PUT | `/fecha-cierre` | `{ "fechaCierre": "2026-11-10" }` | `{ "fechaCierre": "2026-11-10" }` | 200, 401, 422 |
 
 `{id}` es el código (`PER-0001`, `PAG-0007`). Sin token válido todas responden 401 `NO_AUTENTICADO`; con token de otro rol, 403 `ACCESO_DENEGADO`.
 
-- `GET /reservas`: `{ "registrations": [Registration...], "capacity": 60, "fechaCierre": "2026-11-09", "today": "2026-10-28" }`. Todas las reservas, activas o no, con pagos y salud, ordenadas por código descendente [SUPUESTO]. Sin paginación (volumen de cientos) [SUPUESTO]. `Cache-Control: no-store`. Sin `counters` (los asigna el servidor).
+- `GET /reservas`: `{ "registrations": [Registration...], "capacity": 60, "occupied": 10, "paramo": { "capacity": 30, "occupied": 12, "available": 18 }, "fechaCierre": "2026-11-09", "today": "2026-10-28" }`. Todas las reservas, activas o no, con pagos y salud, ordenadas por código descendente [SUPUESTO]. Sin paginación (volumen de cientos) [SUPUESTO]. `Cache-Control: no-store`. Sin `counters` (los asigna el servidor).
 - `POST /reservas/{id}/pagos`: crea un pago **ya verificado** (`review: "Aprobado"`, `origen MANUAL`, `date` = hoy). Reglas RN-16 y RN-15. Respuesta `{ "id": "PAG-0002", "concept": "Pago de saldo", "amount": 100000, "date": "2026-10-28", "review": "Aprobado", "rejectionReason": null }`.
 - `PUT /pagos/{id}/revision`: `review` es `"Aprobado"`, `"Rechazado"` o `"Por revisar"`; cualquier otro valor: 400 `REVISION_INVALIDA`. `Rechazado` exige `reason` no vacío tras recortar espacios; en los otros dos, `reason` se ignora y el motivo queda nulo. Aprobar aplica RN-15 y, si la reserva estaba Rechazada, RN-18. Idempotente si la revisión ya es la pedida. Devuelve la `Registration` actualizada.
 - `PUT /reservas/{id}/autorizacion-menor`: fija `guardianAuthorized` a `received` (boolean obligatorio). Se acepta aunque el titular sea mayor de edad [SUPUESTO: el front no lo impide].
@@ -406,7 +410,8 @@ Port de `validateNewRegistration`; devuelve el **primer** error. Los números so
 8. Acompañante (si viene): `validatePerson` con `quien = acompañante`; con `kit` talla en catálogo; sin `kit` talla nula. Luego `validateDistinct`: documento, correo, celular distintos; contacto de emergencia de cada uno no es el otro (por celular y por nombre), en el orden del front.
 9. Plan: en catálogo; `apartado` con primer día elegible <= cierre y fecha compromiso entre primer día y cierre; `total` con fecha nula.
 10. Documentos duplicados (bajo bloqueo): titular y luego acompañante contra inscripciones activas (RN-06) → 409 `DOCUMENTO_DUPLICADO`.
-11. Cupo del páramo (bajo bloqueo): personas con estadía `Páramo` frente a disponibles → 409 `SIN_CUPO_PARAMO`.
+11. Cupo de la carrera (bajo bloqueo): sin cupos libres → 409 `CARRERA_AGOTADA`.
+12. Cupos del páramo (bajo bloqueo): personas con estadía `Páramo` frente a disponibles → 409 `SIN_CUPO_PARAMO`.
 
 Normalización previa (`Normalizador`, aplicada por `ReservaMapper` antes de validar; V18 y `flujo-app.md` §5): nombres, apellidos y nombre del contacto en MAYÚSCULAS y sin tildes (la Ñ se conserva); ciudad y EPS "Otra" sin tildes; documento sin puntos, espacios ni guiones y en mayúsculas; teléfonos solo con dígitos y sin indicativo; correo en minúsculas y sin espacios; espacios dobles a uno y Unicode NFC en todo texto. Los detalles de salud no se normalizan. Los patrones y los CHECK de la base se aplican al valor ya normalizado. Los valores de catálogo se reciben como texto, nunca como `enum`, para devolver el mensaje del front y no un 400 genérico.
 
@@ -416,7 +421,7 @@ Normalización previa (`Normalizador`, aplicada por `ReservaMapper` antes de val
 - **Orden fijo**: configuración y luego inscripción; sin interbloqueos.
 - **Documento**: la comprobación en servicio da el mensaje; `uq_participante_documento_activo` respalda ante cualquier carrera residual; la violación se traduce a 409 `DOCUMENTO_DUPLICADO` (por nombre de restricción, sin valores).
 - **Caducidad (H4, RN-22)**: `CaducidadReservasService` (tarea `@Scheduled` `app.reservas.caducidad.cron`, cada 10 min, activable con `app.reservas.caducidad.activa`) lee por lotes (paginación por id, `app.reservas.caducidad.lote`) las reservas con un pago `POR_REVISAR` con `en_revision_desde <= ahora - horas` y sin pagos aprobados, **sin bloqueo**, y por cada una llama a `RevisionPagoService.rechazarPorCaducidad`, una transacción por reserva que toma el mismo orden (configuración, luego inscripción) y **vuelve a comprobar** pagos aprobados y antigüedad bajo bloqueo. Reutiliza `aplicar` (estado derivado, `activa` y `documento_activo` coherentes). Un fallo de una reserva se registra (solo el código y la clase de la excepción) y no frena a las demás. Frente a una aprobación simultánea, el bloqueo serializa: si gana la tarea, la aprobación reactiva la reserva (RN-18); si gana la aprobación, la tarea no hace nada. Nunca queda un pago aprobado en una reserva inactiva.
-- **Cupo**: ocupados se recalculan bajo el bloqueo global, nunca se guardan.
+- **Cupos**: los de la carrera y los del páramo se recalculan bajo el bloqueo global, nunca se guardan. Crear la reserva los aparta; rechazarla (a mano o por caducidad) los libera; reactivarla los vuelve a validar.
 - `@Transactional` en servicios; `readOnly = true` en consultas.
 
 ## 10. Seguridad
@@ -502,12 +507,13 @@ Normalización previa (`Normalizador`, aplicada por `ReservaMapper` antes de val
 | 400 | REVISION_INVALIDA | "La revisión del pago no es válida." [SUPUESTO] |
 | 422 | MOTIVO_REQUERIDO | "Indica el motivo del rechazo." |
 | 422 | AUTORIZACION_MENOR_PENDIENTE | "El titular es menor de edad: falta la autorización firmada por su responsable." |
-| 409 | SIN_CUPO_PARA_APROBAR | "No hay cupos en el páramo para confirmar esta inscripción ({m} en páramo, {n} libres). Cambia los cupos del páramo en Gestión de cupos." |
+| 409 | CARRERA_AGOTADA | "Ya no hay cupos disponibles para la carrera. Será en una siguiente oportunidad." |
+| 409 | SIN_CUPO_PARA_APROBAR | Al reactivar una reserva Rechazada: "Ya no hay cupos en la carrera para reactivar esta inscripción. Cambia los cupos en Gestión de cupos." / "No hay cupos en el páramo para reactivar esta inscripción ({m} en páramo, {n} libres). Cambia los cupos del páramo en Gestión de cupos." |
 | 409 | DOCUMENTO_DUPLICADO | (RN-18) "El documento {documento} ya tiene una reserva registrada." (para la administradora no se añade "Si no fuiste tú") |
 | 422 | MONTO_INVALIDO | "Escribe un monto válido." |
 | 422 | MONTO_SUPERA_SALDO | "El monto supera el saldo pendiente." |
 | 400 | DATOS_INVALIDOS | (cuerpo ausente o `received` no booleano) |
-| 422 | CAPACIDAD_INVALIDA | "Los cupos del páramo deben ser un número entero." / "Los cupos del páramo no pueden ser menos que los {n} ya ocupados." / "Debe haber al menos 1 cupo en el páramo." |
+| 422 | CAPACIDAD_INVALIDA | "Los cupos de la carrera deben ser un número entero." / "Los cupos de la carrera no pueden ser menos que las {n} reservas activas." / "Debe haber al menos 1 cupo en la carrera." / "Los cupos del páramo deben ser un número entero." / "Los cupos del páramo no pueden ser menos que los {n} cupos ya ocupados." / "Debe haber al menos 1 cupo en el páramo." (`campo` `capacity` o `paramo`) |
 | 422 | FECHA_CIERRE_INVALIDA | "Elige una fecha de cierre válida." / "La fecha de cierre no puede ser anterior a la apertura de inscripciones." / "La fecha de cierre debe ser antes del evento." |
 
 ### 12.3 Autenticación y transversales
@@ -559,7 +565,7 @@ Sin tocar pantallas ni lógica de negocio. El front sigue calculando y validando
 
 ## 15. Pruebas
 - Unitarias de `regla/` con tablas de casos tomadas de las funciones del front (cada mensaje de la sección 12 tiene un caso).
-- Integración con Testcontainers: registro público feliz y cada error; cupos solo con pago aprobado; documento liberado por Rechazado; menores con y sin autorización; revisión (aprobar, rechazar con motivo, deshacer) y pago manual; capacidad y fecha de cierre; concurrencia (dos reservas por el último cupo del páramo; dos aprobaciones simultáneas; mismo documento en paralelo); autenticación completa (login, bloqueo, refresh con rotación, reutilización revoca la familia, logout, cabecera obligatoria); CORS con credenciales; rate limit; perfil `prod`; Actuator.
+- Integración con Testcontainers: registro público feliz y cada error; cupos apartados al reservar y liberados al rechazar; documento liberado por Rechazado; menores con y sin autorización; revisión (aprobar, rechazar con motivo, deshacer) y pago manual; capacidad y fecha de cierre; concurrencia (dos reservas por el último cupo del páramo o el último cupo de la carrera; dos reactivaciones simultáneas; mismo documento en paralelo); autenticación completa (login, bloqueo, refresh con rotación, reutilización revoca la familia, logout, cabecera obligatoria); CORS con credenciales; rate limit; perfil `prod`; Actuator.
 - Privacidad: el valor en `ficha_salud` no contiene el texto original; ningún dato de salud en los logs ni en la auditoría.
 - Avisos (HU-N15): unitarias de `DecisorAvisos` y `FormatoAviso`; `ClienteBrevo` contra `MockRestServiceServer` (cabeceras, cuerpo, reintentos); integración con Testcontainers y `ClienteBrevo` simulado (recordatorios por fecha, idempotencia, aprobación y rechazo tras el commit, revisión fallida sin correo, víspera del evento, logs sin datos personales).
 - Contrato: cargas JSON generadas del front (`buildNewRegistration`) aceptadas y respuestas que cumplen `Registration`.
@@ -568,12 +574,12 @@ Sin tocar pantallas ni lógica de negocio. El front sigue calculando y validando
 Cada punto es una pregunta concreta. El diseño asume la respuesta marcada con *por defecto*.
 
 1. **Acompañante menor de edad.** El front solo exige responsable y autorización para el *titular* menor. *Por defecto*: se permite un acompañante menor sin autorización ni responsable adicional. ¿Es correcto?
-2. **Edad de "menor".** El front evalúa a la fecha de hoy, no al día del evento. *Por defecto*: hoy. ¿O al 15 de noviembre?
+2. **Edad de "menor".** El front evalúa a la fecha de hoy, no al día del evento. *Por defecto*: hoy. ¿O al 28 de noviembre?
 3. **Reactivar una inscripción Rechazada** (aprobar o devolver un pago, o registrar un pago manual) cuando otro ya tomó su documento. *Por defecto*: 409 `DOCUMENTO_DUPLICADO` (RN-18). ¿Correcto?
 4. **Dominio en producción.** `SameSite=Strict` exige que el front y la API compartan dominio registrable (`app.dominio.com` y `api.dominio.com`). ¿Cuál será el dominio del sitio, del panel y de la API? ¿En qué origen corre el panel `/admin` en desarrollo (¿el mismo 5173?) para `CORS_ORIGIN`?
 5. **Precios.** El front lee precios de `shared/config` (estáticos). *Por defecto*: el servidor es la fuente y `GET /config` los expone; el front conserva el estático solo como respaldo. Si cambian los precios solo en el servidor, el total que muestra el front antes de enviar podría diferir hasta que lea `GET /config`. ¿Quieres que el front lea `GET /config`?
 6. **Cambio de precios, fechas del evento y versión de términos**: *por defecto* solo por migración (el panel cambia únicamente cupos y fecha de cierre). ¿Se necesita editarlos desde el panel?
-7. **Valores iniciales** de la migración = `shared/config` (evento 15 y 16 de noviembre de 2026; apertura 2026-10-28; cierre 2026-11-09; 60 cupos; términos `TYC-2026-10-28`). ¿Son definitivos?
+7. **Valores iniciales** de la migración = `shared/config` (evento 28 y 29 de noviembre de 2026; apertura 2026-10-28; cierre 2026-11-09; 60 cupos; términos `TYC-2026-10-28`). ¿Son definitivos?
 8. **Sesión sin "recordar"**: *por defecto* 8 horas de refresh. ¿O que termine al cerrar el navegador (sin `Max-Age`) con tope de 8 horas?
 9. **Varias pestañas del panel**: el refresh de un solo uso con detección de reutilización cierra la sesión si dos pestañas rotan a la vez. *Por defecto*: el front serializa el refresh (Web Locks) y no hay ventana de gracia en el servidor. ¿Aceptas, o prefieres una gracia de 10 s?
 10. **Bloqueo y límites**: 5 fallos / 15 min de bloqueo por cuenta; login 20 por 15 min por IP; refresh 60/min por IP; registro 10/min por IP. ¿Valores correctos?

@@ -68,9 +68,10 @@ class RevisionPagoTest extends ReservaPublicaBase {
 				String.class, codigoInscripcion);
 	}
 
-	private int ocupados() throws Exception {
+	/** Cupos del páramo ocupados según {@code GET /api/v1/disponibilidad}. */
+	private int cuposParamo() throws Exception {
 		String json = mvc.perform(get("/api/v1/disponibilidad")).andReturn().getResponse().getContentAsString();
-		return new tools.jackson.databind.json.JsonMapper().readTree(json).get("occupied").asInt();
+		return new tools.jackson.databind.json.JsonMapper().readTree(json).get("paramo").get("occupied").asInt();
 	}
 
 	// --- éxito
@@ -118,11 +119,11 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void aprobarElPrimerPagoConTitularEnParamoCambiaLaDisponibilidadDe0a1() throws Exception {
+	void laCamaSeApartaAlReservarYAprobarNoCambiaLaDisponibilidad() throws Exception {
 		crearTitular();
-		assertThat(ocupados()).isZero();
+		assertThat(cuposParamo()).isEqualTo(1);
 		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
-		assertThat(ocupados()).isEqualTo(1);
+		assertThat(cuposParamo()).isEqualTo(1);
 	}
 
 	@Test
@@ -145,17 +146,18 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void devolverUnPagoAprobadoAPorRevisarBorraRevisorYLiberaLosCupos() throws Exception {
+	void devolverUnPagoAprobadoAPorRevisarBorraRevisorYConservaLosCupos() throws Exception {
 		crearTitular();
 		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
-		assertThat(ocupados()).isEqualTo(1);
+		assertThat(cuposParamo()).isEqualTo(1);
 		assertThat(pago("PAG-0001").get("revisado_por")).isEqualTo(adminId());
 		assertThat(pago("PAG-0001").get("revisado_en")).isNotNull();
 
 		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk())
 				.andExpect(jsonPath("$.payments[0].review").value("Por revisar"))
 				.andExpect(jsonPath("$.payments[0].rejectionReason").value(nullValue()));
-		assertThat(ocupados()).isZero();
+		// La reserva sigue activa: conserva su cupo de la carrera y su cupo del páramo.
+		assertThat(cuposParamo()).isEqualTo(1);
 		assertThat(pago("PAG-0001").get("revisado_por")).isNull();
 		assertThat(pago("PAG-0001").get("revisado_en")).isNull();
 		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(true);
@@ -269,17 +271,35 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void aprobarDosPersonasEnParamoConUnCupoLibreDa409() throws Exception {
+	void reactivarDosPersonasEnParamoConUnaCamaLibreDa409() throws Exception {
 		jdbc.update("update configuracion_evento set cupos_paramo = 2");
 		crear(ReservaJson.conAcompanante());
+		// Rechazada, libera sus dos cupos; otra reserva toma una.
+		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
 		crear(ReservaJson.titular().set("document", "1065000111"));
-		aprobarPagos("PER-0002");
+
+		for (String review : List.of("Aprobado", "Por revisar")) {
+			revisar("PAG-0001", review, null).andExpect(status().isConflict())
+					.andExpect(jsonPath("$.code").value("SIN_CUPO_PARA_APROBAR"))
+					.andExpect(jsonPath("$.detail").value("No hay cupos en el páramo para reactivar esta inscripción "
+							+ "(2 en páramo, 1 libres). Cambia los cupos del páramo en Gestión de cupos."));
+		}
+		assertThat(pago("PAG-0001").get("revision")).isEqualTo("RECHAZADO");
+		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(false);
+	}
+
+	@Test
+	void reactivarSinCupoEnLaCarreraDa409() throws Exception {
+		jdbc.update("update configuracion_evento set cupos_carrera = 1");
+		crear(ReservaJson.titular().set("stay", "Hotel en Manaure"));
+		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
+		crear(ReservaJson.titular().set("document", "1065000111").set("stay", "Regreso a casa"));
 
 		revisar("PAG-0001", "Aprobado", null).andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("SIN_CUPO_PARA_APROBAR"))
-				.andExpect(jsonPath("$.detail").value("No hay cupos en el páramo para confirmar esta inscripción "
-						+ "(2 en páramo, 1 libres). Cambia los cupos del páramo en Gestión de cupos."));
-		assertThat(pago("PAG-0001").get("revision")).isEqualTo("POR_REVISAR");
+				.andExpect(jsonPath("$.detail").value(
+						"Ya no hay cupos en la carrera para reactivar esta inscripción. Cambia los cupos en Gestión de cupos."));
+		assertThat(pago("PAG-0001").get("revision")).isEqualTo("RECHAZADO");
 	}
 
 	@Test
@@ -316,7 +336,7 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void rechazarODevolverAPorRevisarNuncaSeBloqueaPorMenorNiPorCupo() throws Exception {
+	void rechazarODevolverUnaReservaActivaNuncaSeBloqueaPorMenorNiPorCupo() throws Exception {
 		crear(menor());
 		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
 		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk());
@@ -327,7 +347,9 @@ class RevisionPagoTest extends ReservaPublicaBase {
 		jdbc.update("update configuracion_evento set cupos_paramo = 1");
 		revisar("PAG-0002", "Por revisar", null).andExpect(status().isOk());
 		revisar("PAG-0002", "Rechazado", "x").andExpect(status().isOk());
-		revisar("PAG-0002", "Por revisar", null).andExpect(status().isOk());
+		// Rechazada ya liberó sus cupos: reactivarla exige que vuelvan a caber.
+		revisar("PAG-0002", "Por revisar", null).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("SIN_CUPO_PARA_APROBAR"));
 	}
 
 	// --- concurrencia
@@ -364,17 +386,18 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	}
 
 	@RepeatedTest(5)
-	void dosAprobacionesSimultaneasPorElUltimoCupoDan200Y409() throws Exception {
-		jdbc.update("update configuracion_evento set cupos_paramo = 1");
+	void dosReactivacionesSimultaneasPorLaUltimaCamaDan200Y409() throws Exception {
 		crear(ReservaJson.titular());
 		crear(ReservaJson.titular().set("document", "1065000111"));
-		adminId();
+		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
+		revisar("PAG-0002", "Rechazado", "x").andExpect(status().isOk());
+		jdbc.update("update configuracion_evento set cupos_paramo = 1");
 
 		List<Integer> estados = enParalelo(List.of(() -> estado("PAG-0001", "Aprobado", null),
 				() -> estado("PAG-0002", "Aprobado", null)));
 
 		assertThat(estados).containsExactlyInAnyOrder(200, 409);
-		assertThat(ocupados()).isEqualTo(1);
+		assertThat(cuposParamo()).isEqualTo(1);
 		assertThat(jdbc.queryForObject("select count(*) from pago where revision = 'APROBADO'", Integer.class))
 				.isEqualTo(1);
 	}

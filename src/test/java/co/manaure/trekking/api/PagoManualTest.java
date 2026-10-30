@@ -53,9 +53,10 @@ class PagoManualTest extends ReservaPublicaBase {
 		return jdbc.queryForMap("select * from inscripcion where codigo = ?", codigo);
 	}
 
-	private int ocupados() throws Exception {
+	/** Cupos del páramo ocupados según {@code GET /api/v1/disponibilidad}. */
+	private int cuposParamo() throws Exception {
 		String json = mvc.perform(get("/api/v1/disponibilidad")).andReturn().getResponse().getContentAsString();
-		return new tools.jackson.databind.json.JsonMapper().readTree(json).get("occupied").asInt();
+		return new tools.jackson.databind.json.JsonMapper().readTree(json).get("paramo").get("occupied").asInt();
 	}
 
 	// --- éxito
@@ -109,11 +110,11 @@ class PagoManualTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void elPrimerPagoAprobadoOcupaElCupoDelParamo() throws Exception {
+	void laCamaSeApartaAlReservarYElPagoManualNoLaCambia() throws Exception {
 		crear(ReservaJson.titular());
-		assertThat(ocupados()).isZero();
+		assertThat(cuposParamo()).isEqualTo(1);
 		pagoManual("PER-0001", monto(350000)).andExpect(status().isCreated());
-		assertThat(ocupados()).isEqualTo(1);
+		assertThat(cuposParamo()).isEqualTo(1);
 	}
 
 	@Test
@@ -187,15 +188,17 @@ class PagoManualTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void sinCupoEnElParamoParaUnaReservaQueAunNoOcupaDa409() throws Exception {
+	void reactivarConPagoManualSinCamaEnElParamoDa409() throws Exception {
 		jdbc.update("update configuracion_evento set cupos_paramo = 1");
 		crear(ReservaJson.titular());
+		// Rechazada, libera su cupo y otra reserva la toma.
+		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
 		crear(ReservaJson.titular().set("document", "1065000111"));
-		aprobarPagos("PER-0002");
 
 		pagoManual("PER-0001", monto(350000)).andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("SIN_CUPO_PARA_APROBAR"));
 		assertThat(contar("pago")).isEqualTo(2);
+		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(false);
 	}
 
 	@Test

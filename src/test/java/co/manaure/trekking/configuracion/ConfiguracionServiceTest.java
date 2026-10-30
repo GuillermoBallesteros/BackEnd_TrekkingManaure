@@ -34,9 +34,10 @@ class ConfiguracionServiceTest {
 		ConfiguracionEvento c = servicio.obtener();
 
 		assertThat(c.getId()).isEqualTo((short) 1);
-		assertThat(c.getFechaEventoInicio()).isEqualTo(LocalDate.of(2026, 11, 15));
+		assertThat(c.getFechaEventoInicio()).isEqualTo(LocalDate.of(2026, 11, 28));
 		assertThat(c.getFechaCierre()).isEqualTo(LocalDate.of(2026, 11, 9));
-		assertThat(c.getCuposParamo()).isEqualTo(60);
+		assertThat(c.getCuposCarrera()).isEqualTo(60);
+		assertThat(c.getCuposParamo()).isEqualTo(30);
 		assertThat(c.getPrecioTitular()).isEqualTo(350000L);
 		assertThat(c.getValorApartado()).isEqualTo(50000L);
 		assertThat(c.getKitCompleto()).isEqualTo(300000L);

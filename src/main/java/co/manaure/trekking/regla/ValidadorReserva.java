@@ -30,7 +30,15 @@ public final class ValidadorReserva {
 				() -> acompanante(reserva, ctx),
 				() -> ValidadorPlan.validar(reserva.plan(), reserva.fechaCompromiso(), ctx.hoy(), evento),
 				() -> documentosDuplicados(reserva, ctx),
+				() -> cupoCarrera(ctx),
 				() -> cupoParamo(reserva, ctx));
+	}
+
+	/** Cada reserva gasta un cupo de la carrera, con o sin acompañante. */
+	public static Optional<ErrorRegla> cupoCarrera(ContextoReserva ctx) {
+		return ctx.cuposCarreraDisponibles() > 0 ? Optional.empty()
+				: ErrorRegla.de(CodigoError.CARRERA_AGOTADA,
+						"Ya no hay cupos disponibles para la carrera. Será en una siguiente oportunidad.", null);
 	}
 
 	/** Las inscripciones y los pagos del restante se cierran después de la fecha de cierre. */

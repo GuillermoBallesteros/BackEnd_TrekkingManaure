@@ -282,7 +282,8 @@ class EsquemaRestriccionesTest {
 		Map<String, Object> c = jdbc.queryForMap("select * from configuracion_evento");
 		assertThat(num(c, "id")).isEqualTo(1);
 		assertThat(c).containsEntry("nombre_evento", "Trekking Desafío Perijá 13K")
-				.containsEntry("cupos_paramo", 60)
+				.containsEntry("cupos_carrera", 60)
+				.containsEntry("cupos_paramo", 30)
 				.containsEntry("precio_titular", 350000L)
 				.containsEntry("valor_apartado", 50000L)
 				.containsEntry("precio_acompanante_sin_kit", 150000L)
@@ -291,8 +292,8 @@ class EsquemaRestriccionesTest {
 				.containsEntry("precio_parapente", 200000L)
 				.containsEntry("precio_hotel_noche", 45000L)
 				.containsEntry("version_terminos", "TYC-2026-10-28");
-		assertThat(c.get("fecha_evento_inicio").toString()).isEqualTo("2026-11-15");
-		assertThat(c.get("fecha_evento_fin").toString()).isEqualTo("2026-11-16");
+		assertThat(c.get("fecha_evento_inicio").toString()).isEqualTo("2026-11-28");
+		assertThat(c.get("fecha_evento_fin").toString()).isEqualTo("2026-11-29");
 		assertThat(c.get("fecha_apertura").toString()).isEqualTo("2026-10-28");
 		assertThat(c.get("fecha_cierre").toString()).isEqualTo("2026-11-09");
 	}

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import co.manaure.trekking.api.ReservaMapper;
 import co.manaure.trekking.api.dto.AdminReservas;
+import co.manaure.trekking.api.dto.CuposResponse;
 import co.manaure.trekking.api.dto.Registration;
 import co.manaure.trekking.auditoria.AccionAuditoria;
 import co.manaure.trekking.auditoria.AuditoriaService;
@@ -78,10 +79,13 @@ public class ReservaAdminService {
 		ConfiguracionEvento cfg = configuracion.obtener();
 		LocalDate hoy = LocalDate.now(clock);
 		List<Inscripcion> lista = inscripciones.findAllByOrderByIdDesc();
+		int ocupados = Math.toIntExact(inscripciones.contarActivas());
+		CuposResponse paramo = CuposResponse.de(cfg.getCuposParamo(), participantes.contarOcupados(-1L));
 		if (lista.isEmpty()) {
-			return new AdminReservas(List.of(), cfg.getCuposParamo(), cfg.getFechaCierre(), hoy);
+			return new AdminReservas(List.of(), cfg.getCuposCarrera(), ocupados, paramo, cfg.getFechaCierre(), hoy);
 		}
-		return new AdminReservas(registrations(lista), cfg.getCuposParamo(), cfg.getFechaCierre(), hoy);
+		return new AdminReservas(registrations(lista), cfg.getCuposCarrera(), ocupados, paramo, cfg.getFechaCierre(),
+				hoy);
 	}
 
 	/**

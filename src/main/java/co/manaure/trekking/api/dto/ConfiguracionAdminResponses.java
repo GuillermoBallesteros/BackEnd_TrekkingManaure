@@ -8,7 +8,7 @@ public final class ConfiguracionAdminResponses {
 	private ConfiguracionAdminResponses() {
 	}
 
-	public record Capacidad(int capacity) {
+	public record Capacidad(int capacity, int paramo) {
 	}
 
 	public record FechaCierre(LocalDate fechaCierre) {

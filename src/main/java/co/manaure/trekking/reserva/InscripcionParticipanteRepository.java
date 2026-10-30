@@ -14,14 +14,15 @@ public interface InscripcionParticipanteRepository extends JpaRepository<Inscrip
 	List<InscripcionParticipante> porInscripciones(@Param("ids") Collection<Long> ids);
 
 	/**
-	 * Cupos ocupados (RN-04): personas con estadía que ocupa cupo en inscripciones con al menos un pago aprobado.
-	 * Una sola consulta agregada. {@code excluir} = -1 salvo al aprobar un pago (diseño §5).
+	 * Cupos del páramo ocupados (RN-04): uno por persona, titular o acompañante, con estadía que ocupa cupo en una
+	 * inscripción activa. El cupo se aparta al crear la reserva y se libera cuando deja de estar activa (rechazada o
+	 * caducada). Una sola consulta agregada. {@code excluir} = -1 si no se excluye ninguna inscripción.
 	 */
 	@Query(value = """
 			SELECT count(*) FROM inscripcion_participante ip
+			JOIN inscripcion i ON i.id = ip.inscripcion_id AND i.activa
 			JOIN estadia e ON e.clave = ip.estadia AND e.ocupa_cupo
-			WHERE EXISTS (SELECT 1 FROM pago p WHERE p.inscripcion_id = ip.inscripcion_id AND p.revision = 'APROBADO')
-			  AND ip.inscripcion_id <> :excluir
+			WHERE ip.inscripcion_id <> :excluir
 			""", nativeQuery = true)
 	long contarOcupados(@Param("excluir") long excluir);
 

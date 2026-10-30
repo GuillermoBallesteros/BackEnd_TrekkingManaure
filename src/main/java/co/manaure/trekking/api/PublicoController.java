@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import co.manaure.trekking.api.dto.ConfigResponse;
+import co.manaure.trekking.api.dto.CuposResponse;
 import co.manaure.trekking.api.dto.DisponibilidadResponse;
 import co.manaure.trekking.configuracion.ConfiguracionService;
 import co.manaure.trekking.reserva.DisponibilidadService;
@@ -30,7 +31,9 @@ public class PublicoController {
 	@GetMapping("/disponibilidad")
 	public DisponibilidadResponse disponibilidad() {
 		DisponibilidadService.Resumen r = disponibilidad.consultar();
-		return new DisponibilidadResponse(r.capacidad(), r.ocupados(), r.disponibles(), r.fechaCierre(), r.hoy());
+		return new DisponibilidadResponse(r.capacidad(), r.ocupados(), r.disponibles(),
+				new CuposResponse(r.paramoCapacidad(), r.paramoOcupados(), r.paramoDisponibles()), r.fechaCierre(),
+				r.hoy());
 	}
 
 }

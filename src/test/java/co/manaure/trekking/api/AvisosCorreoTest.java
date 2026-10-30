@@ -130,7 +130,7 @@ class AvisosCorreoTest extends ReservaPublicaBase {
 		assertThat(tresDias.params()).containsEntry("nombre", "Ana Maria").containsEntry("codigoReserva", "PER-0001")
 				.containsEntry("total", "$350.000").containsEntry("pagado", "$50.000")
 				.containsEntry("saldo", "$300.000").containsEntry("pagoCompleto", false)
-				.containsEntry("fechaCompromiso", "9 de noviembre").containsEntry("fechaEvento", "15 de noviembre")
+				.containsEntry("fechaCompromiso", "9 de noviembre").containsEntry("fechaEvento", "28 de noviembre")
 				.doesNotContainKeys("documento", "eps", "salud", "codigoPago");
 		assertThat(tresDias.params().values()).doesNotContain("1065123456");
 
@@ -242,9 +242,9 @@ class AvisosCorreoTest extends ReservaPublicaBase {
 		esperarEnvio(TipoAviso.PAGO_APROBADO);
 		clearInvocations(cliente);
 
-		dia(11, 13);
+		dia(11, 26);
 		assertThat(recordatorios.ejecutar()).isZero();
-		dia(11, 14);
+		dia(11, 27);
 		assertThat(recordatorios.ejecutar()).isEqualTo(2);
 		assertThat(recordatorios.ejecutar()).isZero();
 

@@ -13,6 +13,7 @@ import java.time.ZoneId;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,15 +53,16 @@ class PublicoControllerIntegrationTest {
 	@Autowired InscripcionParticipanteRepository participantes;
 	@Autowired PagoRepository pagos;
 
+	@BeforeEach
 	@AfterEach
 	void limpiar() {
 		for (String tabla : new String[] { "pago", "inscripcion_participante", "inscripcion", "persona" }) {
 			jdbc.update("delete from " + tabla);
 		}
-		jdbc.update("update configuracion_evento set cupos_paramo = 60");
+		jdbc.update("update configuracion_evento set cupos_carrera = 60, cupos_paramo = 60");
 	}
 
-	/** Crea una inscripcion con titular y, si se pide, acompanante; devuelve el pago aun por revisar. */
+	/** Crea una inscripcion activa con titular y, si se pide, acompanante; devuelve el pago aun por revisar. */
 	private Pago reserva(String estadiaTitular, String estadiaAcompanante) {
 		Inscripcion insc = inscripciones.save(new Inscripcion(codigos.siguienteCodigoInscripcion(), PlanPago.TOTAL, null,
 				350000, 50000, 150000, 350000, 150000, 200000, 45000, 350000, LocalDate.of(2026, 10, 28)));
@@ -99,8 +101,8 @@ class PublicoControllerIntegrationTest {
 		mvc.perform(get("/api/v1/config"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.evento.nombre").value("Trekking Desafío Perijá 13K"))
-				.andExpect(jsonPath("$.evento.fechas[0]").value("2026-11-15"))
-				.andExpect(jsonPath("$.evento.fechas[1]").value("2026-11-16"))
+				.andExpect(jsonPath("$.evento.fechas[0]").value("2026-11-28"))
+				.andExpect(jsonPath("$.evento.fechas[1]").value("2026-11-29"))
 				.andExpect(jsonPath("$.evento.fechaAperturaInscripciones").value("2026-10-28"))
 				.andExpect(jsonPath("$.evento.fechaCierre").value("2026-11-09"));
 	}
@@ -131,42 +133,58 @@ class PublicoControllerIntegrationTest {
 				.andExpect(jsonPath("$.capacity").value(60))
 				.andExpect(jsonPath("$.occupied").value(0))
 				.andExpect(jsonPath("$.available").value(60))
+				.andExpect(jsonPath("$.paramo.capacity").value(60))
+				.andExpect(jsonPath("$.paramo.occupied").value(0))
+				.andExpect(jsonPath("$.paramo.available").value(60))
 				.andExpect(jsonPath("$.fechaCierre").value("2026-11-09"))
 				// tolerancia por si la prueba cruza la medianoche de Bogota
 				.andExpect(jsonPath("$.today").value(anyOf(is(hoy.toString()), is(hoy.plusDays(1).toString()))));
 	}
 
 	@Test
-	void pagoPorRevisarNoOcupaCupo() throws Exception {
+	void unaReservaConPagoPorRevisarYaApartaSuCupoYSusCamas() throws Exception {
 		reserva("Páramo", null);
-		disponibilidad().andExpect(jsonPath("$.occupied").value(0)).andExpect(jsonPath("$.available").value(60));
+		disponibilidad().andExpect(jsonPath("$.occupied").value(1)).andExpect(jsonPath("$.available").value(59))
+				.andExpect(jsonPath("$.paramo.occupied").value(1)).andExpect(jsonPath("$.paramo.available").value(59));
 	}
 
 	@Test
-	void pagoAprobadoOcupaUnoDosOUnoSegunEstadias() throws Exception {
-		aprobar(reserva("Páramo", null));
-		disponibilidad().andExpect(jsonPath("$.occupied").value(1));
+	void cadaReservaGastaUnCupoYCadaPersonaEnParamoUnaCama() throws Exception {
+		reserva("Páramo", null);
+		disponibilidad().andExpect(jsonPath("$.occupied").value(1)).andExpect(jsonPath("$.paramo.occupied").value(1));
 
-		aprobar(reserva("Páramo", "Páramo"));
-		disponibilidad().andExpect(jsonPath("$.occupied").value(3)).andExpect(jsonPath("$.available").value(57));
+		reserva("Páramo", "Páramo");
+		disponibilidad().andExpect(jsonPath("$.occupied").value(2)).andExpect(jsonPath("$.available").value(58))
+				.andExpect(jsonPath("$.paramo.occupied").value(3)).andExpect(jsonPath("$.paramo.available").value(57));
 
 		aprobar(reserva("Páramo", "Hotel en Manaure"));
-		disponibilidad().andExpect(jsonPath("$.occupied").value(4));
+		disponibilidad().andExpect(jsonPath("$.occupied").value(3)).andExpect(jsonPath("$.paramo.occupied").value(4));
 	}
 
 	@Test
-	void hotelYRegresoACasaAprobadosNoOcupan() throws Exception {
-		aprobar(reserva("Hotel en Manaure", null));
+	void hotelYRegresoACasaGastanCupoDeCarreraPeroNoCamas() throws Exception {
+		reserva("Hotel en Manaure", null);
 		aprobar(reserva("Regreso a casa", "Regreso a casa"));
-		disponibilidad().andExpect(jsonPath("$.occupied").value(0)).andExpect(jsonPath("$.available").value(60));
+		disponibilidad().andExpect(jsonPath("$.occupied").value(2)).andExpect(jsonPath("$.available").value(58))
+				.andExpect(jsonPath("$.paramo.occupied").value(0)).andExpect(jsonPath("$.paramo.available").value(60));
+	}
+
+	@Test
+	void unaReservaInactivaLiberaSuCupoYSusCamas() throws Exception {
+		Pago pago = reserva("Páramo", "Páramo");
+		jdbc.update("update inscripcion set activa = false where id = ?", pago.getInscripcion().getId());
+		disponibilidad().andExpect(jsonPath("$.occupied").value(0)).andExpect(jsonPath("$.available").value(60))
+				.andExpect(jsonPath("$.paramo.occupied").value(0)).andExpect(jsonPath("$.paramo.available").value(60));
 	}
 
 	@Test
 	void availableNuncaEsNegativo() throws Exception {
-		aprobar(reserva("Páramo", "Páramo"));
-		jdbc.update("update configuracion_evento set cupos_paramo = 1");
+		reserva("Páramo", "Páramo");
+		reserva("Hotel en Manaure", null);
+		jdbc.update("update configuracion_evento set cupos_carrera = 1, cupos_paramo = 1");
 		disponibilidad().andExpect(jsonPath("$.capacity").value(1)).andExpect(jsonPath("$.occupied").value(2))
-				.andExpect(jsonPath("$.available").value(0));
+				.andExpect(jsonPath("$.available").value(0)).andExpect(jsonPath("$.paramo.capacity").value(1))
+				.andExpect(jsonPath("$.paramo.occupied").value(2)).andExpect(jsonPath("$.paramo.available").value(0));
 	}
 
 	@Test

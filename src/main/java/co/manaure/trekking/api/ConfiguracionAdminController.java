@@ -27,8 +27,8 @@ public class ConfiguracionAdminController {
 	@PutMapping("/capacidad")
 	public Capacidad fijarCapacidad(@RequestBody(required = false) CapacidadRequest cuerpo,
 			@AuthenticationPrincipal Jwt jwt) {
-		return new Capacidad(servicio.fijarCapacidad(cuerpo == null ? null : cuerpo.capacity(),
-				Long.valueOf(jwt.getSubject())));
+		return servicio.fijarCapacidad(cuerpo == null ? null : cuerpo.capacity(),
+				cuerpo == null ? null : cuerpo.paramo(), Long.valueOf(jwt.getSubject()));
 	}
 
 	@PutMapping("/fecha-cierre")

@@ -62,7 +62,7 @@ abstract class ReservaPublicaBase {
 			jdbc.update("delete from " + tabla);
 		}
 		jdbc.update("""
-				update configuracion_evento set cupos_paramo = 60, precio_titular = 350000, valor_apartado = 50000,
+				update configuracion_evento set cupos_carrera = 60, cupos_paramo = 60, precio_titular = 350000, valor_apartado = 50000,
 				  precio_acompanante_sin_kit = 150000, precio_acompanante_con_kit = 350000,
 				  precio_cuatrimoto = 150000, precio_parapente = 200000, precio_hotel_noche = 45000""");
 	}
