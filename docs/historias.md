@@ -18,7 +18,7 @@ Versión 2: el backend se ajusta al front. Reglas, datos, precios y estados: `do
 | HU-03 Login | Reemplazada por HU-N05 y HU-N06 | Correo, access de 15 min y refresh rotatorio en cookie |
 | HU-04 Listar y filtrar / HU-05 Detalle | Reemplazadas por HU-N07 | El panel recibe todas las reservas completas y filtra en el cliente |
 | HU-06 Registrar abono | Reemplazada por HU-N08 y HU-N09 | El pago nace "Por revisar" y se aprueba, o se registra manual |
-| HU-07 Anular abono | **Eliminada** | El front no anula pagos: rechaza con motivo o devuelve a "Por revisar" (HU-N08) |
+| HU-07 Anular abono | **Eliminada** | El front no anula pagos: rechaza con motivo; "Deshacer" justo después lo regresa a "Por revisar" (HU-N08) |
 | HU-08 Anular inscripción | **Eliminada** | El estado derivado "Rechazado" libera cupo y documento |
 | HU-09 Corregir persona | **Eliminada** | El front no edita personas; sin contraparte |
 | HU-10 Resumen | **Eliminada** | El panel calcula cifras en el cliente a partir de la lista |
@@ -92,7 +92,7 @@ Criterios:
 - Ejemplo del flujo §7 nº 3 = 1100000; nº 4 (titular + acompañante sin kit + hotel 2 noches x 2) = 680000.
 - Pago inicial: `apartado` = `min(50000, total)` con concepto `SEPARACION_CUPO`; `total` = total con `PAGO_TOTAL`.
 - Estado derivado: sin pagos = Por verificar; un pago `POR_REVISAR` = Por verificar; todos `RECHAZADO` = Rechazado; aprobado menor al total sin fecha compromiso o con fecha >= hoy = Saldo pendiente; con fecha < hoy = Vencido; aprobado >= total = Pagado; aprobado > 0 con otro pago `POR_REVISAR` = Saldo pendiente.
-- Cupos: solo cuentan personas con estadía `Páramo` de inscripciones con al menos un pago aprobado; una inscripción solo `POR_REVISAR` ocupa 0.
+- Cupos: la carrera cuenta reservas activas; el páramo cuenta personas con estadía `Páramo` de reservas activas, aunque su pago siga `POR_REVISAR` (RN-04).
 - Documentos (parametrizado por los 6 tipos): CC de 5 dígitos inválida con "El documento del participante no es válido: entre 6 y 10 dígitos."; TI con persona de 6 años y RC con persona de 8 años producen `DOCUMENTO_EDAD_INCOMPATIBLE` con el texto del front; Pasaporte alfanumérico de 5 a 20 es válido.
 - Teléfonos: un caso válido y uno inválido por cada uno de los 13 países; `fijo` válido solo para el contacto de emergencia en los países que lo admiten; México, Estados Unidos, Argentina y República Dominicana rechazan fijo.
 - Nombres: "María José" y "D'Angelo" válidos; "Ana2" y un nombre de 61 caracteres inválidos con `NOMBRE_INVALIDO`.
@@ -102,7 +102,7 @@ Criterios:
 - Menor titular (17 años a hoy) con parentesco "Amigo o amiga" da `MENOR_SIN_RESPONSABLE`; con "Madre", "Padre" o "Tutor legal o acudiente" pasa.
 - Acompañante: con kit sin talla y sin kit con talla dan `TALLA_INVALIDA`; mismo documento, correo o celular que el titular dan `ACOMPANANTE_REPETIDO`.
 - Extras repetidos, desconocidos o `parapenteAcompanante` sin acompañante dan `EXTRA_INVALIDO`.
-- Hotel: ventana hoy 2026-10-28 → llegada 2026-10-28 a 2026-11-14, salida máxima 2026-11-15; llegada 2026-11-15 da "La llegada al hotel debe estar entre el 28 de octubre y el 14 de noviembre."; salida igual a llegada, 0 noches y `withCompanion` sin acompañante dan sus mensajes.
+- Hotel: ventana hoy 2026-10-28 → llegada 2026-10-28 a 2026-11-27, salida máxima 2026-11-28; llegada 2026-11-28 da "La llegada al hotel debe estar entre el 28 de octubre y el 27 de noviembre."; salida igual a llegada, 0 noches y `withCompanion` sin acompañante dan sus mensajes.
 - Plan: `apartado` con fecha < hoy, > cierre o ausente da "Elige la fecha en que pagarás el restante."; `apartado` con primer día > cierre da "Ya pasó la fecha límite para apartar; elige pagar el total."; `total` con fecha da "El pago total no lleva fecha para el restante.".
 - Orden: con varios errores a la vez, se devuelve el primero según el diseño §8.
 - Cada mensaje de `validaciones.ts` y `telefono.ts` listado en el diseño §12.1 tiene al menos un caso de prueba.
@@ -110,20 +110,21 @@ Criterios:
 ---
 
 ## HU-N03 Configuración y disponibilidad públicas
-Como participante quiero ver los datos del evento, los precios y los cupos del páramo para decidir mi reserva.
+Como participante quiero ver los datos del evento, los precios, los cupos de la carrera y los cupos del páramo para decidir mi reserva.
 
 **Rutas:** `GET /api/v1/config` y `GET /api/v1/disponibilidad` (públicas).
 **Salida:** diseño §6.2.
 
 Criterios:
-- `GET /config` con la configuración inicial: 200 con `evento.nombre` "Trekking Desafío Perijá 13K", `evento.fechas` `["2026-11-15","2026-11-16"]`, `fechaAperturaInscripciones` "2026-10-28", `fechaCierre` "2026-11-09".
+- `GET /config` con la configuración inicial: 200 con `evento.nombre` "Trekking Desafío Perijá 13K", `evento.fechas` `["2026-11-28","2026-11-29"]`, `fechaAperturaInscripciones` "2026-10-28", `fechaCierre` "2026-11-09".
 - `precios`: `total` 350000, `inscripcion` 50000, `kitCompleto` 300000, `acompanante` 150000, `acompananteConKit` 350000, `cuatrimoto` 150000, `parapente` 200000, `hotelNoche` 45000, `moneda` "COP".
 - `versionTerminos` es "TYC-2026-10-28".
-- `GET /disponibilidad` sin reservas: `capacity` 60, `occupied` 0, `available` 60, `fechaCierre` "2026-11-09", `today` con la fecha de Bogotá.
-- Una reserva con titular en Páramo y solo un pago `Por revisar` deja `occupied` en 0.
-- Tras aprobar su pago (HU-N08), `occupied` es 1; con acompañante en Páramo, 2; con acompañante en Hotel en Manaure, 1.
-- Estadías `Hotel en Manaure` y `Regreso a casa` aprobadas no cambian `occupied`.
-- `available` = `max(0, capacity - occupied)`; nunca negativo.
+- `GET /disponibilidad` sin reservas: `capacity` 60, `occupied` 0, `available` 60 (carrera), `paramo` `{ capacity, occupied: 0, available }`, `fechaCierre` "2026-11-09", `today` con la fecha de Bogotá.
+- Una reserva con titular en Páramo y solo un pago `Por revisar` ya aparta: `occupied` 1 y `paramo.occupied` 1.
+- Con acompañante en Páramo, la reserva gasta 1 cupo de la carrera y 2 cupos; con acompañante en Hotel en Manaure, 1 y 1.
+- Estadías `Hotel en Manaure` y `Regreso a casa` gastan cupo de la carrera pero no cambian `paramo.occupied`.
+- Una reserva inactiva (Rechazada) no cuenta en ninguno de los dos.
+- `available` = `max(0, capacity - occupied)` en cada contador; nunca negativo.
 - Ambas rutas responden sin autenticación y no incluyen datos de personas ni de administradores.
 - `today` usa el reloj de America/Bogota (prueba con `Clock` fijo a las 23:30 de Bogotá, ya día siguiente en UTC).
 
@@ -143,7 +144,7 @@ Criterios de éxito:
 - El código sale de la secuencia de la base de datos; dos reservas seguidas reciben `PER-0001` y `PER-0002`.
 - La respuesta devuelve `health`, `phone`, `eps`, `emergencyContact`, `commitments` y `consent` con la forma del tipo `Registration`.
 - Titular menor de edad con contacto "Madre": 201 (RN-08); la reserva nace con `guardianAuthorized` false.
-- Una reserva con estadía Hotel en Manaure o Regreso a casa se acepta aunque los cupos del páramo estén agotados.
+- Una reserva con estadía Hotel en Manaure o Regreso a casa se acepta aunque los cupos del páramo estén agotados, si queda cupo en la carrera.
 - La ficha de salud queda cifrada en la base (HU-N01).
 
 Criterios de error (mensaje y `code` del diseño §12.1):
@@ -152,11 +153,12 @@ Criterios de error (mensaje y `code` del diseño §12.1):
 - Un caso por cada código 422 del diseño §12.1, para titular y para acompañante: `NOMBRE_INVALIDO`, `FECHA_NACIMIENTO_INVALIDA`, `TIPO_DOCUMENTO_INVALIDO`, `DOCUMENTO_INVALIDO`, `DOCUMENTO_EDAD_INCOMPATIBLE`, `GENERO_INVALIDO`, `TELEFONO_INVALIDO`, `CORREO_INVALIDO`, `CIUDAD_INVALIDA`, `EPS_INVALIDA`, `CONTACTO_EMERGENCIA_INVALIDO`, `SALUD_INVALIDA`, `COMPROMISO_REQUERIDO`, `CONSENTIMIENTO_REQUERIDO`, `TERMINOS_DESACTUALIZADOS`, `USO_IMAGEN_INVALIDO`, `ESTADIA_INVALIDA`, `MENOR_SIN_RESPONSABLE`, `TALLA_INVALIDA`, `EXTRA_INVALIDO`, `HOTEL_INVALIDO`, `ACOMPANANTE_REPETIDO`, `PLAN_INVALIDO`, `FECHA_COMPROMISO_INVALIDA`.
 - La respuesta de error indica el campo con error en `campo` (por ejemplo `companion.phone.number`).
 - Documento de titular o acompañante ya presente en una inscripción activa (Por verificar, Saldo pendiente, Vencido o Pagado): 409 `DOCUMENTO_DUPLICADO` con "El documento {documento} ya tiene una reserva registrada. Si no fuiste tú, comunícate con la organización para que la revisen." (hallazgo H4, ampliado; el panel conserva el mensaje original).
-- Nota H4: `POST /api/v1/reservas` tiene además un tope de 20 solicitudes por IP en 24 horas (RN-23, 429 con `Retry-After` y alerta) y las reservas sin pago aprobado cuyo pago lleva 12 horas en `Por revisar` se rechazan solas (RN-22, motivo "No se verificó el pago dentro de 12 horas."); la encargada puede devolver ese pago a `Por revisar` (HU-N08).
+- Nota H4: `POST /api/v1/reservas` tiene además un tope de 20 solicitudes por IP en 24 horas (RN-23, 429 con `Retry-After` y alerta) y las reservas sin pago aprobado cuyo pago lleva 12 horas en `Por revisar` se rechazan solas (RN-22, motivo "No se verificó el pago dentro de 12 horas."); si el dinero sí llegó, la encargada reactiva la reserva con un pago manual (HU-N09).
 - Documento presente solo en una inscripción Rechazada: 201 (RN-06).
 - Documento escrito en minúsculas ("ab12345") frente a otro en mayúsculas ("AB12345"): se detecta como duplicado.
 - Personas en Páramo mayores que los cupos disponibles: 409 `SIN_CUPO_PARAMO`; con 0 libres, el mensaje de agotados; con 1 libre y 2 en Páramo, "Solo queda 1 cupo en el páramo y tu reserva necesita 2. ...".
-- Reservar no aparta cupo (RN-04): dos solicitudes simultáneas con documentos distintos por el último cupo responden ambas 201; el cupo se asigna al aprobar (HU-N08, que es donde se prueba la carrera por el último cupo).
+- Carrera llena: 409 `CARRERA_AGOTADA` con "Ya no hay cupos disponibles para la carrera. Será en una siguiente oportunidad.".
+- Reservar aparta los cupos (RN-04) bajo el bloqueo global: dos solicitudes simultáneas con documentos distintos por el último cupo del páramo, o por el último cupo de la carrera, responden 201 y 409.
 - Dos solicitudes simultáneas con el mismo documento: una responde 201 y la otra 409 `DOCUMENTO_DUPLICADO`.
 - `plan` `apartado` con primer día elegible > cierre: 422 `FECHA_COMPROMISO_INVALIDA` ("Ya pasó la fecha límite...").
 - Una reserva rechazada por validación no deja registros parciales (transacción).
@@ -219,14 +221,14 @@ Criterios:
 ## HU-N07 Lista de reservas del panel
 Como administradora quiero ver todas las reservas con sus pagos y datos para dar seguimiento.
 
-**Ruta:** `GET /api/v1/admin/reservas` → `{ registrations, capacity, fechaCierre, today }` (diseño §6.4).
+**Ruta:** `GET /api/v1/admin/reservas` → `{ registrations, capacity, occupied, paramo, fechaCierre, today }` (diseño §6.4).
 
 Criterios:
 - Sin token: 401 `NO_AUTENTICADO`.
 - Devuelve todas las reservas (activas y Rechazadas), cada una como `Registration` completa: persona, acompañante, extras, hotel, plan, `commitmentDate`, `guardianAuthorized`, `payments` con `review` y `rejectionReason`, y `total`.
 - Con dos reservas creadas: orden por `id` descendente.
 - `health` (enfermedad, alergias, discapacidad y deporte) llega descifrado, con `null` en los detalles vacíos (RN-19 relajada).
-- `capacity` y `fechaCierre` salen de la configuración; `today` es la fecha de Bogotá.
+- `capacity` (carrera), `paramo.capacity` y `fechaCierre` salen de la configuración; `occupied` y `paramo.occupied` se calculan como en `GET /disponibilidad`; `today` es la fecha de Bogotá.
 - La respuesta cumple el tipo `Registration` del front (prueba de contrato con campos y tipos; ver HU-N14).
 - Un participante sin acompañante da `companion: null`; sin hotel, `preEventHotel: null`.
 - Los valores de catálogo viajan con el texto del front (`"Páramo"`, `"Hotel en Manaure"`, `"Tutor legal o acudiente"`).
@@ -237,7 +239,9 @@ Criterios:
 ---
 
 ## HU-N08 Revisión de pagos
-Como administradora quiero aprobar, rechazar o devolver a revisión un pago para reflejar lo que verifiqué en Bre-B.
+Como administradora quiero aprobar o rechazar un pago para reflejar lo que verifiqué en Bre-B, y deshacer esa decisión justo después si me equivoqué.
+
+El panel no tiene botón "Devolver a revisión" para pagos ya decididos: la transición a `Por revisar` solo la usa "Deshacer", en el aviso que sigue a cada decisión.
 
 **Ruta:** `PUT /api/v1/admin/pagos/{id}/revision` `{ review, reason }` → `Registration`. **Reglas:** RN-04, RN-05, RN-06, RN-14, RN-15, RN-18.
 
@@ -245,10 +249,10 @@ Criterios de éxito:
 - Aprobar un pago `Por revisar`: 200; el pago queda `Aprobado` con `rejectionReason` null; el estado derivado de la reserva deja de ser Por verificar.
 - Pago de 350000 aprobado en una reserva de 350000: estado derivado Pagado (el front lo calcula; el servidor guarda `activa` true).
 - Pago de 50000 aprobado en una de 650000: Saldo pendiente.
-- Aprobar el primer pago de una reserva con titular en Páramo hace que `GET /disponibilidad` pase de `occupied` 0 a 1.
+- Aprobar el pago de una reserva activa no cambia `GET /disponibilidad`: el cupo del páramo ya se apartó al reservar.
 - Rechazar con `reason` "El pago no aparece en la llave Bre-B": 200; `review` "Rechazado", `rejectionReason` con el texto sin espacios sobrantes.
 - Rechazar el único pago deja la reserva Rechazada (`activa` false) y libera el documento de sus personas: una nueva reserva con ese documento da 201.
-- Volver un pago `Aprobado` a `Por revisar`: 200; `rejectionReason` null; los cupos que ocupaba se liberan si no quedan otros pagos aprobados.
+- Volver un pago `Aprobado` a `Por revisar`: 200; `rejectionReason` null; la reserva sigue activa y conserva sus cupos.
 - Volver un pago `Rechazado` a `Por revisar`: 200; el motivo se borra; la reserva vuelve a `activa` true.
 - Aprobar un pago ya aprobado es idempotente: 200 sin cambios.
 - Cada transición se audita (`APROBAR_PAGO`, `RECHAZAR_PAGO`, `DEVOLVER_PAGO_A_REVISION`) con el código del pago y la transición, sin el texto del motivo.
@@ -260,11 +264,12 @@ Criterios de error:
 - `review` ausente o distinto de los tres valores: 400 `REVISION_INVALIDA`.
 - `Rechazado` sin `reason`, vacío o solo espacios: 422 `MOTIVO_REQUERIDO` con "Indica el motivo del rechazo.".
 - Aprobar con titular menor de edad y `guardianAuthorized` false: 422 `AUTORIZACION_MENOR_PENDIENTE` y el pago no cambia.
-- Aprobar el primer pago de una reserva con 2 personas en Páramo con 1 cupo libre: 409 `SIN_CUPO_PARA_APROBAR` con "No hay cupos en el páramo para confirmar esta inscripción (2 en páramo, 1 libres). ...".
-- Aprobar un segundo pago de una reserva que ya ocupa cupo no vuelve a validar cupos (RN-05).
+- Reactivar (aprobar o devolver a `Por revisar`) una reserva Rechazada con 2 personas en Páramo y 1 cupo libre: 409 `SIN_CUPO_PARA_APROBAR` con "No hay cupos en el páramo para reactivar esta inscripción (2 en páramo, 1 libres). ...".
+- Reactivar una reserva Rechazada con la carrera llena: 409 `SIN_CUPO_PARA_APROBAR` con "Ya no hay cupos en la carrera para reactivar esta inscripción. ...".
+- Aprobar un pago de una reserva activa no vuelve a validar cupos (RN-05).
 - Aprobar o devolver a revisión un pago de una reserva Rechazada cuyo documento ya tiene otra inscripción activa: 409 `DOCUMENTO_DUPLICADO` (RN-18).
-- Rechazar o devolver a `Por revisar` nunca se bloquea por menor ni por cupo.
-- Dos aprobaciones simultáneas de reservas distintas por el último cupo del páramo: una responde 200 y la otra 409 `SIN_CUPO_PARA_APROBAR`.
+- Rechazar, o devolver a `Por revisar` un pago de una reserva activa, nunca se bloquea por menor ni por cupo.
+- Dos reactivaciones simultáneas de reservas Rechazadas por el último cupo del páramo: una responde 200 y la otra 409 `SIN_CUPO_PARA_APROBAR`.
 - Dos revisiones simultáneas del mismo pago no dejan el estado de la reserva inconsistente (`activa` y `documento_activo` coinciden con el estado derivado).
 
 ---
@@ -279,12 +284,12 @@ Criterios:
 - Reserva de 650000 sin aprobados y `amount` 50000: concepto "Separación de cupo".
 - Con 50000 ya aprobados y `amount` 600000: concepto "Pago de saldo"; la reserva queda Pagado.
 - Se guardan `origen` MANUAL, `registrado_por` y `revisado_por`; se audita `REGISTRAR_PAGO_MANUAL` con el código y el monto.
-- Si la reserva ocupa cupo por primera vez, los cupos del páramo se validan como en la aprobación.
+- Si el pago reactiva una reserva Rechazada, su cupo de la carrera y sus cupos del páramo se validan como en la aprobación.
 - Sin token: 401. Reserva inexistente: 404 `RESERVA_NO_ENCONTRADA` con "La inscripción ya no existe.".
 - `amount` ausente, decimal, cero o negativo: 422 `MONTO_INVALIDO` con "Escribe un monto válido.".
 - `amount` mayor que `max(0, total - pagado)`: 422 `MONTO_SUPERA_SALDO` con "El monto supera el saldo pendiente.". Con la reserva ya Pagado, cualquier monto lo supera.
 - Titular menor sin autorización: 422 `AUTORIZACION_MENOR_PENDIENTE`.
-- Sin cupo del páramo para una reserva que aún no ocupa: 409 `SIN_CUPO_PARA_APROBAR`.
+- Reactivar una reserva Rechazada sin cupo libre en el páramo: 409 `SIN_CUPO_PARA_APROBAR`.
 - Reserva Rechazada cuyo documento ya tomó otra inscripción activa: 409 `DOCUMENTO_DUPLICADO` (RN-18); si no, el pago manual la reactiva (`activa` true).
 - Dos pagos manuales simultáneos que juntos superan el saldo: uno responde 201 y el otro 422 `MONTO_SUPERA_SALDO`.
 
@@ -309,17 +314,19 @@ Criterios:
 ---
 
 ## HU-N11 Capacidad del páramo
-Como administradora quiero cambiar los cupos del páramo para ajustarlos a la logística.
+Como administradora quiero cambiar los cupos de la carrera y los cupos del páramo para ajustarlos a la logística.
 
-**Ruta:** `PUT /api/v1/admin/capacidad` `{ capacity }` → `{ capacity }`. **Regla:** RN-17.
+**Ruta:** `PUT /api/v1/admin/capacidad` `{ capacity, paramo }` → `{ capacity, paramo }` (`capacity` = carrera). **Regla:** RN-17.
 
 Criterios:
-- `capacity` 80 con 12 ocupados: 200 con `capacity` 80; `GET /disponibilidad` muestra `capacity` 80 y `available` 68.
-- `capacity` igual a los ocupados: 200.
-- `capacity` menor que los ocupados (10 con 12 ocupados): 422 `CAPACIDAD_INVALIDA` con "Los cupos del páramo no pueden ser menos que los 12 ya ocupados.".
-- Sin ocupados y `capacity` 0 o negativo: 422 `CAPACIDAD_INVALIDA` con "Debe haber al menos 1 cupo en el páramo.".
-- `capacity` decimal (10.5), ausente o texto: 422 `CAPACIDAD_INVALIDA` con "Los cupos del páramo deben ser un número entero.".
-- Los ocupados se calculan bajo el bloqueo de configuración: una aprobación simultánea no permite dejar la capacidad por debajo de lo ocupado.
+- `{ capacity: 70, paramo: 80 }` con 6 reservas activas y 12 cupos ocupados: 200; `GET /disponibilidad` muestra `capacity` 70, `available` 64, `paramo.capacity` 80 y `paramo.available` 68.
+- Cada valor igual a lo ocupado: 200.
+- `paramo` menor que los cupos ocupados (10 con 12): 422 `CAPACIDAD_INVALIDA` con "Los cupos del páramo no pueden ser menos que los 12 cupos ya ocupados." y `campo` `paramo`.
+- `capacity` menor que las reservas activas (5 con 6): 422 `CAPACIDAD_INVALIDA` con "Los cupos de la carrera no pueden ser menos que las 6 reservas activas." y `campo` `capacity`.
+- Sin ocupados y 0 o negativo: 422 con "Debe haber al menos 1 cupo en la carrera." o "Debe haber al menos 1 cupo en el páramo.".
+- Decimal (10.5), ausente, nulo o texto: 422 con "Los cupos de la carrera deben ser un número entero." o "Los cupos del páramo deben ser un número entero." (se valida primero `capacity`).
+- Se audita `FIJAR_CAPACIDAD` con "carrera anterior=60, nuevo=70; paramo anterior=60, nuevo=80".
+- Los ocupados se calculan bajo el bloqueo de configuración: una reserva simultánea no permite dejar la capacidad por debajo de lo ocupado.
 - Se guardan `actualizado_por` y `actualizado_en`; se audita `FIJAR_CAPACIDAD` con valor anterior y nuevo.
 - Sin token: 401.
 
@@ -334,7 +341,7 @@ Criterios:
 - `fechaCierre` "2026-11-12": 200; `GET /config` y `GET /disponibilidad` devuelven la nueva fecha.
 - Fecha igual a la apertura (2026-10-28): 200. Fecha en el pasado respecto de hoy pero >= apertura: 200 (cierra antes; las nuevas reservas dan 409 `INSCRIPCIONES_CERRADAS`).
 - Fecha anterior a la apertura: 422 `FECHA_CIERRE_INVALIDA` con "La fecha de cierre no puede ser anterior a la apertura de inscripciones.".
-- Fecha igual o posterior al primer día del evento (2026-11-15): 422 con "La fecha de cierre debe ser antes del evento.".
+- Fecha igual o posterior al primer día del evento (2026-11-28): 422 con "La fecha de cierre debe ser antes del evento.".
 - Fecha con formato inválido ("12/11/2026") o inexistente ("2026-02-30"), o ausente: 422 con "Elige una fecha de cierre válida.".
 - Tras moverla, `POST /reservas` con `apartado` acepta fechas compromiso hasta la nueva fecha y rechaza las posteriores.
 - Se guardan `actualizado_por` y `actualizado_en`; se audita `FIJAR_FECHA_CIERRE` con valor anterior y nuevo.
@@ -365,7 +372,7 @@ Como equipo quiero comprobar de extremo a extremo el sistema y cerrar los riesgo
 
 Criterios:
 - `docker compose up --build -d` levanta backend y base; el front corre en Vite (5173) con `CORS_ORIGIN=http://localhost:5173`; el puerto 8080 del front no entra en conflicto (README lo aclara).
-- Recorrido manual verificado: reservar desde el formulario; el contador de cupos sube solo tras aprobar; login en `/admin`; aprobar, rechazar con motivo y deshacer; pago manual; marcar autorización de un menor; cambiar capacidad y fecha de cierre; recargar y comprobar que persiste; cerrar sesión y comprobar 401.
+- Recorrido manual verificado: reservar desde el formulario; el contador de cupos sube al reservar y baja al rechazar; login en `/admin`; aprobar, rechazar con motivo y deshacer; pago manual; marcar autorización de un menor; cambiar capacidad y fecha de cierre; recargar y comprobar que persiste; cerrar sesión y comprobar 401.
 - Pruebas de contrato con cargas JSON del front para `Registration`, `Payment` y `SesionResponse`.
 - En la base, `ficha_salud` aparece cifrada y las cookies de refresh salen `HttpOnly`.
 - Ningún dato de salud en los logs de la API durante el recorrido.
