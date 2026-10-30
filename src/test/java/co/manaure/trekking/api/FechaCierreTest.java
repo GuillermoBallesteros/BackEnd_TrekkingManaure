@@ -67,14 +67,14 @@ class FechaCierreTest extends ConfiguracionAdminBase {
 	}
 
 	@ParameterizedTest
-	@ValueSource(strings = { "2026-11-15", "2026-11-16", "2027-01-01" })
+	@ValueSource(strings = { "2026-11-28", "2026-11-29", "2027-01-01" })
 	void igualOPosteriorAlPrimerDiaDelEventoDa422(String fecha) throws Exception {
 		esperar422("{\"fechaCierre\":\"" + fecha + "\"}", "La fecha de cierre debe ser antes del evento.");
 	}
 
 	@Test
 	void laVisperaDelEventoSeAcepta() throws Exception {
-		enviarPut(RUTA, "{\"fechaCierre\":\"2026-11-14\"}").andExpect(status().isOk());
+		enviarPut(RUTA, "{\"fechaCierre\":\"2026-11-27\"}").andExpect(status().isOk());
 	}
 
 	@ParameterizedTest
@@ -121,7 +121,7 @@ class FechaCierreTest extends ConfiguracionAdminBase {
 
 	@Test
 	void unaFechaRechazadaNoAudita() throws Exception {
-		enviarPut(RUTA, "{\"fechaCierre\":\"2026-11-15\"}").andExpect(status().isUnprocessableEntity());
+		enviarPut(RUTA, "{\"fechaCierre\":\"2026-11-28\"}").andExpect(status().isUnprocessableEntity());
 		assertThat(jdbc.queryForObject("select count(*) from auditoria where accion = 'FIJAR_FECHA_CIERRE'",
 				Integer.class)).isZero();
 	}

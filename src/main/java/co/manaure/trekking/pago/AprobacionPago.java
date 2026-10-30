@@ -16,10 +16,10 @@ import co.manaure.trekking.regla.CalculadoraCupos;
 import co.manaure.trekking.regla.CatalogoReglas;
 import co.manaure.trekking.regla.Fechas;
 import co.manaure.trekking.regla.adaptador.CatalogoReglasAdaptador;
-import co.manaure.trekking.regla.modelo.PagoRegla;
 import co.manaure.trekking.reserva.Inscripcion;
 import co.manaure.trekking.reserva.InscripcionParticipante;
 import co.manaure.trekking.reserva.InscripcionParticipanteRepository;
+import co.manaure.trekking.reserva.InscripcionRepository;
 import co.manaure.trekking.reserva.RolParticipante;
 
 /**
@@ -30,16 +30,20 @@ import co.manaure.trekking.reserva.RolParticipante;
 public class AprobacionPago {
 
 	private final InscripcionParticipanteRepository participantes;
+	private final InscripcionRepository inscripciones;
 	private final CatalogoReglasAdaptador catalogos;
 
-	public AprobacionPago(InscripcionParticipanteRepository participantes, CatalogoReglasAdaptador catalogos) {
+	public AprobacionPago(InscripcionParticipanteRepository participantes, InscripcionRepository inscripciones,
+			CatalogoReglasAdaptador catalogos) {
 		this.participantes = participantes;
+		this.inscripciones = inscripciones;
 		this.catalogos = catalogos;
 	}
 
 	/**
-	 * Valida, en este orden: menor (solo si se aprueba), documento (si la reserva pasa de inactiva a activa) y cupo
-	 * (solo si se aprueba y la reserva aún no retiene cupo). Lanza {@link NegocioException} sin tocar nada.
+	 * Valida, en este orden: menor (solo si se aprueba) y, si la reserva pasa de inactiva a activa, documento y cupos.
+	 * Los cupos se apartan al crear la reserva: aprobar un pago nunca falla por cupo salvo al reactivar una reserva
+	 * que los había liberado. Lanza {@link NegocioException} sin tocar nada.
 	 */
 	public void validar(ConfiguracionEvento cfg, Inscripcion inscripcion, List<InscripcionParticipante> personas,
 			List<Pago> pagosActuales, boolean aprobando, boolean activaDespues, LocalDate hoy) {
@@ -48,9 +52,7 @@ public class AprobacionPago {
 		}
 		if (activaDespues && !inscripcion.isActiva()) {
 			validarDocumentos(inscripcion, personas);
-		}
-		if (aprobando && !retieneCupo(pagosActuales)) {
-			validarCupos(cfg, inscripcion, personas);
+			validarCuposAlReactivar(cfg, inscripcion, personas);
 		}
 	}
 
@@ -60,11 +62,6 @@ public class AprobacionPago {
 		for (InscripcionParticipante p : personas) {
 			p.setDocumentoActivo(activa ? p.getPersona().getDocumento() : null);
 		}
-	}
-
-	private static boolean retieneCupo(List<Pago> todos) {
-		return CalculadoraCupos
-				.retieneCupo(todos.stream().map(p -> new PagoRegla(p.getMonto(), p.getRevision())).toList());
 	}
 
 	private void validarMenor(Inscripcion inscripcion, List<InscripcionParticipante> personas, LocalDate hoy) {
@@ -92,17 +89,20 @@ public class AprobacionPago {
 		}
 	}
 
-	/** RN-05: al aprobar el primer pago, las personas en Páramo deben caber en los cupos libres (sin esta reserva). */
-	private void validarCupos(ConfiguracionEvento cfg, Inscripcion inscripcion,
+	/** Una reserva rechazada o caducada liberó sus cupos: al reactivarla deben caber de nuevo en carrera y páramo. */
+	private void validarCuposAlReactivar(ConfiguracionEvento cfg, Inscripcion inscripcion,
 			List<InscripcionParticipante> personas) {
-		CatalogoReglas catalogo = catalogos.catalogos();
+		if (cfg.getCuposCarrera() - inscripciones.contarActivas() < 1) {
+			throw new NegocioException(CodigoError.SIN_CUPO_PARA_APROBAR, HttpStatus.CONFLICT,
+					"Ya no hay cupos en la carrera para reactivar esta inscripción. Cambia los cupos en Gestión de cupos.");
+		}
 		int enParamo = CalculadoraCupos.personasParamo(
-				personas.stream().map(InscripcionParticipante::getEstadia).toList(), catalogo);
+				personas.stream().map(InscripcionParticipante::getEstadia).toList(), catalogos.catalogos());
 		long libres = Math.max(0, cfg.getCuposParamo() - participantes.contarOcupados(inscripcion.getId()));
 		if (libres < enParamo) {
 			throw new NegocioException(CodigoError.SIN_CUPO_PARA_APROBAR, HttpStatus.CONFLICT,
-					"No hay cupos en el páramo para confirmar esta inscripción (" + enParamo + " en páramo, "
-							+ libres + " libres). Cambia los cupos del páramo en Gestión de cupos.");
+					"No hay cupos en el páramo para reactivar esta inscripción (" + enParamo + " en páramo, " + libres
+							+ " libres). Cambia los cupos del páramo en Gestión de cupos.");
 		}
 	}
 

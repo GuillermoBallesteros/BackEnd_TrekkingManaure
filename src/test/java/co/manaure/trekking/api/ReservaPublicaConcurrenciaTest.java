@@ -50,18 +50,30 @@ class ReservaPublicaConcurrenciaTest extends ReservaPublicaBase {
 		assertThat(contar("pago")).isEqualTo(1);
 	}
 
-	@Test
-	void documentosDistintosPorElUltimoCupoResponden201LosDos() throws Exception {
+	@RepeatedTest(5)
+	void documentosDistintosPorLaUltimaCamaDelParamoDan201Y409() throws Exception {
 		jdbc.update("update configuracion_evento set cupos_paramo = 1");
 
 		List<Integer> estados = enviarEnParalelo(List.of(ReservaJson.titular().json(),
 				ReservaJson.titular().set("document", "1065000111").set("email", "otra@example.com").json()));
 
-		// Reservar no aparta cupo (RN-04): el cupo se asigna al aprobar el pago.
-		assertThat(estados).containsExactly(201, 201);
-		assertThat(contar("inscripcion")).isEqualTo(2);
+		// Reservar aparta el cupo (RN-04) bajo el bloqueo de la configuración: solo una se queda con ella.
+		assertThat(estados).containsExactlyInAnyOrder(201, 409);
+		assertThat(contar("inscripcion")).isEqualTo(1);
 		assertThat(jdbc.queryForObject("select count(*) from pago where revision = 'POR_REVISAR'", Integer.class))
-				.isEqualTo(2);
+				.isEqualTo(1);
+	}
+
+	@RepeatedTest(5)
+	void documentosDistintosPorElUltimoCupoDeLaCarreraDan201Y409() throws Exception {
+		jdbc.update("update configuracion_evento set cupos_carrera = 1");
+
+		List<Integer> estados = enviarEnParalelo(List.of(ReservaJson.titular().set("stay", "Hotel en Manaure").json(),
+				ReservaJson.titular().set("stay", "Regreso a casa").set("document", "1065000111")
+						.set("email", "otra@example.com").json()));
+
+		assertThat(estados).containsExactlyInAnyOrder(201, 409);
+		assertThat(contar("inscripcion")).isEqualTo(1);
 	}
 
 }

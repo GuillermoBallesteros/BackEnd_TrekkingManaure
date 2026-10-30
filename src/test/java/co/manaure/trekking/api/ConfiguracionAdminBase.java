@@ -24,7 +24,7 @@ abstract class ConfiguracionAdminBase extends ReservaPublicaBase {
 	private void restaurar() {
 		jdbc.update("delete from auditoria where entidad = 'CONFIGURACION'");
 		jdbc.update("""
-				update configuracion_evento set cupos_paramo = 60, fecha_cierre = date '2026-11-09',
+				update configuracion_evento set cupos_carrera = 60, cupos_paramo = 60, fecha_cierre = date '2026-11-09',
 				  actualizado_por = null, actualizado_en = null""");
 	}
 
@@ -37,7 +37,10 @@ abstract class ConfiguracionAdminBase extends ReservaPublicaBase {
 		return mvc.perform(put(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpoJson));
 	}
 
-	/** Deja {@code parejas * 2} personas ocupando cupo: reservas con acompañante en el páramo y pago aprobado. */
+	/**
+	 * Deja {@code parejas} reservas activas (cupos de la carrera) y {@code parejas * 2} cupos del páramo ocupados:
+	 * reservas con acompañante en el páramo y pago aprobado.
+	 */
 	protected void ocupar(int parejas) throws Exception {
 		for (int i = 0; i < parejas; i++) {
 			enviar(ReservaJson.conAcompanante().set("document", "106500010" + i).set("email", "t" + i + "@example.com")

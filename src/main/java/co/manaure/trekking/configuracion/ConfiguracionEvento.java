@@ -33,6 +33,9 @@ public class ConfiguracionEvento {
 	@Column(name = "fecha_cierre", nullable = false)
 	private LocalDate fechaCierre;
 
+	@Column(name = "cupos_carrera", nullable = false)
+	private int cuposCarrera;
+
 	@Column(name = "cupos_paramo", nullable = false)
 	private int cuposParamo;
 
@@ -75,6 +78,7 @@ public class ConfiguracionEvento {
 	public LocalDate getFechaEventoFin() { return fechaEventoFin; }
 	public LocalDate getFechaApertura() { return fechaApertura; }
 	public LocalDate getFechaCierre() { return fechaCierre; }
+	public int getCuposCarrera() { return cuposCarrera; }
 	public int getCuposParamo() { return cuposParamo; }
 	public long getPrecioTitular() { return precioTitular; }
 	public long getValorApartado() { return valorApartado; }
@@ -87,9 +91,10 @@ public class ConfiguracionEvento {
 	public Long getActualizadoPor() { return actualizadoPor; }
 	public OffsetDateTime getActualizadoEn() { return actualizadoEn; }
 
-	/** HU-N11: cambia los cupos del páramo y deja constancia de quién y cuándo. */
-	public void fijarCupos(int cupos, Long administradorId, OffsetDateTime cuando) {
-		this.cuposParamo = cupos;
+	/** HU-N11: cambia los cupos de la carrera y del páramo y deja constancia de quién y cuándo. */
+	public void fijarCupos(int carrera, int paramo, Long administradorId, OffsetDateTime cuando) {
+		this.cuposCarrera = carrera;
+		this.cuposParamo = paramo;
 		this.actualizadoPor = administradorId;
 		this.actualizadoEn = cuando;
 	}

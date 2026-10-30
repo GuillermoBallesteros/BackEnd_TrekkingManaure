@@ -26,17 +26,23 @@ class DisponibilidadServiceTest {
 
 		ConfiguracionService cfgService = mock(ConfiguracionService.class);
 		ConfiguracionEvento cfg = mock(ConfiguracionEvento.class);
-		when(cfg.getCuposParamo()).thenReturn(60);
+		when(cfg.getCuposCarrera()).thenReturn(60);
+		when(cfg.getCuposParamo()).thenReturn(30);
 		when(cfg.getFechaCierre()).thenReturn(LocalDate.of(2026, 11, 9));
 		when(cfgService.obtener()).thenReturn(cfg);
+		InscripcionRepository inscripciones = mock(InscripcionRepository.class);
+		when(inscripciones.contarActivas()).thenReturn(3L);
 		InscripcionParticipanteRepository repo = mock(InscripcionParticipanteRepository.class);
-		when(repo.contarOcupados(-1L)).thenReturn(3L);
+		when(repo.contarOcupados(-1L)).thenReturn(5L);
 
-		DisponibilidadService.Resumen r = new DisponibilidadService(cfgService, repo, clock).consultar();
+		DisponibilidadService.Resumen r = new DisponibilidadService(cfgService, inscripciones, repo, clock)
+				.consultar();
 
 		assertThat(r.hoy()).isEqualTo(LocalDate.of(2026, 10, 28));
 		assertThat(r.ocupados()).isEqualTo(3);
 		assertThat(r.disponibles()).isEqualTo(57);
+		assertThat(r.paramoOcupados()).isEqualTo(5);
+		assertThat(r.paramoDisponibles()).isEqualTo(25);
 	}
 
 }

@@ -14,6 +14,10 @@ public interface InscripcionRepository extends JpaRepository<Inscripcion, Long> 
 
 	Optional<Inscripcion> findByCodigo(String codigo);
 
+	/** Cupos de la carrera ocupados: una por inscripción activa, con o sin acompañante. */
+	@Query("select count(i) from Inscripcion i where i.activa = true")
+	long contarActivas();
+
 	/** Todas las inscripciones, activas o no, la más reciente primero (HU-N07). */
 	List<Inscripcion> findAllByOrderByIdDesc();
 

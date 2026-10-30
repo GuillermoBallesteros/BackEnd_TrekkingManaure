@@ -30,7 +30,7 @@ public class NegocioException extends RuntimeException {
 	 */
 	public static NegocioException de(ErrorRegla error) {
 		HttpStatus estado = switch (error.code()) {
-			case INSCRIPCIONES_CERRADAS, DOCUMENTO_DUPLICADO, SIN_CUPO_PARAMO -> HttpStatus.CONFLICT;
+			case INSCRIPCIONES_CERRADAS, DOCUMENTO_DUPLICADO, SIN_CUPO_PARAMO, CARRERA_AGOTADA -> HttpStatus.CONFLICT;
 			default -> HttpStatus.UNPROCESSABLE_ENTITY;
 		};
 		return new NegocioException(error.code(), estado, error.detail(),

@@ -101,7 +101,7 @@ public class ReservaService {
 				cfg.getFechaCierre(), cfg.getVersionTerminos());
 
 		Optional<ErrorRegla> error = ValidadorReserva.validar(reserva,
-				new ContextoReserva(catalogo, evento, hoy, documentosActivos(reserva), cuposLibres(cfg)));
+				new ContextoReserva(catalogo, evento, hoy, documentosActivos(reserva), cuposParamoLibres(cfg), cuposCarreraLibres(cfg)));
 		if (error.isPresent()) {
 			throw NegocioException.de(error.get());
 		}
@@ -121,9 +121,13 @@ public class ReservaService {
 		return Set.copyOf(participantes.documentosActivos(documentos));
 	}
 
-	private int cuposLibres(ConfiguracionEvento cfg) {
+	private int cuposParamoLibres(ConfiguracionEvento cfg) {
 		long ocupados = participantes.contarOcupados(-1L);
 		return (int) Math.max(0, cfg.getCuposParamo() - ocupados);
+	}
+
+	private int cuposCarreraLibres(ConfiguracionEvento cfg) {
+		return (int) Math.max(0, cfg.getCuposCarrera() - inscripciones.contarActivas());
 	}
 
 	private ReservaCompleta guardar(NuevaReserva reserva, ConfiguracionEvento cfg, CatalogoReglas catalogo,
