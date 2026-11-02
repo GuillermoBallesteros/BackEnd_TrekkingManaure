@@ -194,13 +194,15 @@ class AvisosCorreoTest extends ReservaPublicaBase {
 					.containsEntry("concepto", "Pago total").containsEntry("monto", "$350.000");
 		});
 
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk());
 		revisar("PAG-0001", "Rechazado", "Otro motivo").andExpect(status().isOk());
+		revisar("PAG-0001", "Por revisar", null).andExpect(status().isConflict());
 		sinMasEnviosQue(1);
 		assertThat(tipos()).containsExactly(TipoAviso.PAGO_RECHAZADO);
 
+		// Aprobar reactiva la reserva y avisa una vez; la aprobación es definitiva y no hay más correos.
 		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
 		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
+		revisar("PAG-0001", "Rechazado", "Me equivoqué").andExpect(status().isConflict());
 		esperarEnvio(TipoAviso.PAGO_APROBADO);
 		sinMasEnviosQue(2);
 		assertThat(tipos()).containsExactly(TipoAviso.PAGO_RECHAZADO, TipoAviso.PAGO_APROBADO);

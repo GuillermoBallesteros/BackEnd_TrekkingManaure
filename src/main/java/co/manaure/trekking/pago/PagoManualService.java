@@ -66,6 +66,9 @@ public class PagoManualService {
 		Inscripcion inscripcion = inscripciones.findByCodigoForUpdate(codigoReserva)
 				.orElseThrow(() -> new NegocioException(CodigoError.RESERVA_NO_ENCONTRADA, HttpStatus.NOT_FOUND,
 						"La inscripción ya no existe."));
+		if (inscripcion.isRechazada()) {
+			throw RevisionPagoService.reservaRechazada();
+		}
 		if (monto == null || monto <= 0) {
 			throw new NegocioException(CodigoError.MONTO_INVALIDO, HttpStatus.UNPROCESSABLE_ENTITY,
 					"Escribe un monto válido.");
@@ -74,6 +77,12 @@ public class PagoManualService {
 		LocalDate hoy = LocalDate.now(clock);
 		List<Pago> todos = pagos.findByInscripcionIdOrderByIdAsc(inscripcion.getId());
 		List<PagoRegla> reglas = todos.stream().map(p -> new PagoRegla(p.getMonto(), p.getRevision())).toList();
+		// RN-25: una reserva vencida no recibe pagos hasta que la encargada le amplíe el plazo.
+		if (EstadoInscripcion.derivar(inscripcion.getTotal(), reglas, inscripcion.getFechaCompromiso(), hoy,
+				inscripcion.isRechazada()) == EstadoInscripcion.VENCIDO) {
+			throw new NegocioException(CodigoError.RESERVA_VENCIDA, HttpStatus.CONFLICT,
+					"La reserva está vencida: amplía el plazo antes de registrar un pago.");
+		}
 		long pagado = EstadoInscripcion.pagado(reglas);
 		if (monto > EstadoInscripcion.saldo(inscripcion.getTotal(), reglas)) {
 			throw new NegocioException(CodigoError.MONTO_SUPERA_SALDO, HttpStatus.UNPROCESSABLE_ENTITY,
@@ -82,8 +91,8 @@ public class PagoManualService {
 
 		List<PagoRegla> resultantes = new ArrayList<>(reglas);
 		resultantes.add(new PagoRegla(monto, RevisionPago.APROBADO));
-		boolean activaDespues = EstadoInscripcion
-				.derivar(inscripcion.getTotal(), resultantes, inscripcion.getFechaCompromiso(), hoy).activa();
+		boolean activaDespues = EstadoInscripcion.derivar(inscripcion.getTotal(), resultantes,
+				inscripcion.getFechaCompromiso(), hoy, inscripcion.isRechazada()).activa();
 		List<InscripcionParticipante> personas = participantes.porInscripciones(List.of(inscripcion.getId()));
 		aprobacion.validar(cfg, inscripcion, personas, todos, true, activaDespues, hoy);
 

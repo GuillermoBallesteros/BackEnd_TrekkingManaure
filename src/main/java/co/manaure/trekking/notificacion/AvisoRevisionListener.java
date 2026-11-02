@@ -14,9 +14,10 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 import co.manaure.trekking.pago.PagoRevisadoEvent;
+import co.manaure.trekking.reserva.ReservaCambiadaEvent;
 
 /**
- * Aviso inmediato de aprobación o rechazo (RN-24). Solo después del commit: si la revisión se revierte, no sale
+ * Aviso inmediato de aprobación o rechazo de un pago y de los cambios de la reserva (RN-24). Solo después del commit: si la revisión se revierte, no sale
  * correo. El envío va a un hilo propio para que la respuesta del panel nunca espere a Brevo (con reintentos podría
  * tardar decenas de segundos). Un solo hilo conserva el orden de las revisiones de un mismo pago.
  */
@@ -44,6 +45,28 @@ public class AvisoRevisionListener implements DisposableBean {
 		}
 		catch (RejectedExecutionException ex) {
 			log.warn("Avisos: la API se está cerrando; no se avisó la revisión del pago {}.", evento.codigoPago());
+		}
+	}
+
+	/** Reserva recibida, plazo ampliado o reserva rechazada: mismo hilo, así el orden de los avisos se conserva. */
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	public void alCambiarReserva(ReservaCambiadaEvent evento) {
+		try {
+			hilo.execute(() -> avisar(evento));
+		}
+		catch (RejectedExecutionException ex) {
+			log.warn("Avisos: la API se está cerrando; no se avisó {} de la reserva {}.", evento.cambio(),
+					evento.codigoReserva());
+		}
+	}
+
+	private void avisar(ReservaCambiadaEvent evento) {
+		try {
+			avisos.avisarReserva(evento.codigoReserva(), evento.cambio(), evento.referencia());
+		}
+		catch (RuntimeException ex) {
+			log.warn("Avisos: no se pudo avisar {} de la reserva {} ({}).", evento.cambio(), evento.codigoReserva(),
+					ex.getClass().getSimpleName());
 		}
 	}
 

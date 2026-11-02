@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import co.manaure.trekking.notificacion.ContextoAviso.PagoAviso;
 import co.manaure.trekking.notificacion.ContextoAviso.PersonaAviso;
 import co.manaure.trekking.pago.RevisionPago;
+import co.manaure.trekking.reserva.ReservaCambiadaEvent.Cambio;
 
 /**
  * Decide, reclama y envía los avisos de RN-24 (diseño §18). Sin transacción propia: lee con {@link LectorAvisos},
@@ -80,6 +81,25 @@ public class ServicioAvisos {
 			return false;
 		}
 		return enviar(ctx, aviso.get(), pago.get());
+	}
+
+	/**
+	 * Aviso de un cambio de la reserva ya confirmado (recibida, plazo ampliado o rechazada). El acuse lleva el pago
+	 * inicial (concepto y monto) para que la persona sepa qué se está verificando.
+	 */
+	public boolean avisarReserva(String codigoReserva, Cambio cambio, String referencia) {
+		LocalDate hoy = LocalDate.now(clock);
+		Optional<ContextoAviso> leido = lector.porReserva(codigoReserva, hoy);
+		if (leido.isEmpty()) {
+			return false;
+		}
+		ContextoAviso ctx = leido.get();
+		Optional<Aviso> aviso = DecisorAvisos.porCambio(cambio, referencia, ctx.estado(), ctx.fechaCompromiso());
+		if (aviso.isEmpty()) {
+			return false;
+		}
+		PagoAviso pago = cambio == Cambio.RECIBIDA && !ctx.pagos().isEmpty() ? ctx.pagos().get(0) : null;
+		return enviar(ctx, aviso.get(), pago);
 	}
 
 	private boolean enviar(ContextoAviso ctx, Aviso aviso, PagoAviso pago) {

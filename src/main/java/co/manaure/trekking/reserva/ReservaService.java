@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,13 +66,14 @@ public class ReservaService {
 	private final GeneradorCodigos codigos;
 	private final ReservaMapper mapper;
 	private final Clock clock;
+	private final ApplicationEventPublisher eventos;
 
 	public ReservaService(ConfiguracionService configuracion, CatalogoReglasAdaptador catalogos,
 			InscripcionParticipanteRepository participantes, InscripcionRepository inscripciones,
 			InscripcionExtraRepository extras, HotelPrevioRepository hoteles, PersonaRepository personas,
 			FichaSaludRepository fichas, ContactoEmergenciaRepository contactos,
 			ConsentimientoPersonaRepository consentimientos, PagoRepository pagos, GeneradorCodigos codigos,
-			ReservaMapper mapper, Clock clock) {
+			ReservaMapper mapper, Clock clock, ApplicationEventPublisher eventos) {
 		this.configuracion = configuracion;
 		this.catalogos = catalogos;
 		this.participantes = participantes;
@@ -86,6 +88,7 @@ public class ReservaService {
 		this.codigos = codigos;
 		this.mapper = mapper;
 		this.clock = clock;
+		this.eventos = eventos;
 	}
 
 	@Transactional
@@ -105,7 +108,11 @@ public class ReservaService {
 		if (error.isPresent()) {
 			throw NegocioException.de(error.get());
 		}
-		return mapper.aRegistration(guardar(reserva, cfg, catalogo, hoy));
+		ReservaCompleta guardada = guardar(reserva, cfg, catalogo, hoy);
+		// Acuse por correo (RN-24): se atiende solo si esta transacción se confirma.
+		String codigo = guardada.inscripcion().getCodigo();
+		eventos.publishEvent(new ReservaCambiadaEvent(codigo, ReservaCambiadaEvent.Cambio.RECIBIDA, codigo));
+		return mapper.aRegistration(guardada);
 	}
 
 	private Set<String> documentosActivos(NuevaReserva reserva) {

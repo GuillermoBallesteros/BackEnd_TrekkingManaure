@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import co.manaure.trekking.pago.RevisionPago;
 import co.manaure.trekking.regla.EstadoInscripcion;
+import co.manaure.trekking.reserva.ReservaCambiadaEvent.Cambio;
 import co.manaure.trekking.reserva.RolParticipante;
 
 /** HU-N15: qué aviso toca cada día según el estado derivado y las fechas (RN-24). */
@@ -89,6 +90,27 @@ class DecisorAvisosTest {
 		assertThat(DecisorAvisos.porRevision(RevisionPago.RECHAZADO, "PAG-0007"))
 				.contains(new Aviso(TipoAviso.PAGO_RECHAZADO, "PAG-0007", RolParticipante.TITULAR));
 		assertThat(DecisorAvisos.porRevision(RevisionPago.POR_REVISAR, "PAG-0007")).isEmpty();
+	}
+
+	@Test
+	void losCambiosDeLaReservaAvisanAlTitularSoloSiSiguenVigentes() {
+		assertThat(DecisorAvisos.porCambio(Cambio.RECIBIDA, "PER-0001", EstadoInscripcion.POR_VERIFICAR, COMPROMISO))
+				.contains(new Aviso(TipoAviso.RESERVA_RECIBIDA, "PER-0001", RolParticipante.TITULAR));
+		assertThat(DecisorAvisos.porCambio(Cambio.PLAZO_AMPLIADO, "2026-11-09", EstadoInscripcion.SALDO_PENDIENTE,
+				COMPROMISO)).contains(new Aviso(TipoAviso.PLAZO_AMPLIADO, "2026-11-09", RolParticipante.TITULAR));
+		assertThat(DecisorAvisos.porCambio(Cambio.RECHAZADA, "PER-0001", EstadoInscripcion.RECHAZADO, COMPROMISO))
+				.contains(new Aviso(TipoAviso.RESERVA_RECHAZADA, "PER-0001", RolParticipante.TITULAR));
+	}
+
+	@Test
+	void unCambioQueYaNoEsVigenteNoAvisa() {
+		// La fecha volvió a cambiar, o la persona ya pagó, antes de que saliera el aviso.
+		assertThat(DecisorAvisos.porCambio(Cambio.PLAZO_AMPLIADO, "2026-11-12", EstadoInscripcion.SALDO_PENDIENTE,
+				COMPROMISO)).isEmpty();
+		assertThat(DecisorAvisos.porCambio(Cambio.PLAZO_AMPLIADO, "2026-11-09", EstadoInscripcion.PAGADO, COMPROMISO))
+				.isEmpty();
+		assertThat(DecisorAvisos.porCambio(Cambio.RECHAZADA, "PER-0001", EstadoInscripcion.VENCIDO, COMPROMISO))
+				.isEmpty();
 	}
 
 }

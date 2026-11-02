@@ -28,7 +28,7 @@ import co.manaure.trekking.reserva.InscripcionRepository;
 import co.manaure.trekking.reserva.ReservaAdminService;
 
 /**
- * Revisión de pagos (HU-N08): aprobar, rechazar o devolver a "Por revisar". Una sola transacción que toma primero
+ * Revisión de pagos (HU-N08): aprobar o rechazar; la aprobación es definitiva (RN-14). Una sola transacción que toma primero
  * el bloqueo global de la configuración y después la fila de la inscripción (diseño §9, orden fijo). Dentro
  * recalcula el estado derivado y mantiene {@code inscripcion.activa} y {@code documento_activo} coherentes.
  * Las validaciones de la aprobación viven en {@link AprobacionPago} (compartidas con el pago manual, HU-N09).
@@ -87,6 +87,7 @@ public class RevisionPagoService {
 		RevisionPago anterior = pago.getRevision();
 
 		if (anterior != nueva) {
+			validarTransicion(inscripcion, anterior, nueva);
 			aplicar(cfg, inscripcion, pago, todos, nueva, motivoFinal, administradorId);
 			auditoria.registrar(administradorId, accion(nueva), EntidadAuditoria.PAGO, pago.getCodigo(),
 					anterior + ">" + nueva);
@@ -129,6 +130,30 @@ public class RevisionPagoService {
 		return alguno;
 	}
 
+	/**
+	 * RN-14: la aprobación es definitiva y ninguna decisión vuelve a "Por revisar". Solo se permiten
+	 * Por revisar → Aprobado o Rechazado, y Rechazado → Aprobado (reactivar, RN-18). Una reserva vencida rechazada
+	 * (RN-26) ya no admite revisiones. Se comprueba bajo los bloqueos, con la revisión recién leída.
+	 */
+	static void validarTransicion(Inscripcion inscripcion, RevisionPago anterior, RevisionPago nueva) {
+		if (anterior == RevisionPago.APROBADO) {
+			throw new NegocioException(CodigoError.PAGO_APROBADO_DEFINITIVO, HttpStatus.CONFLICT,
+					"Este pago ya está aprobado y la aprobación es definitiva.");
+		}
+		if (nueva == RevisionPago.POR_REVISAR) {
+			throw new NegocioException(CodigoError.REVISION_NO_PERMITIDA, HttpStatus.CONFLICT,
+					"Un pago ya revisado no vuelve a quedar por revisar.");
+		}
+		if (inscripcion.isRechazada()) {
+			throw reservaRechazada();
+		}
+	}
+
+	static NegocioException reservaRechazada() {
+		return new NegocioException(CodigoError.RESERVA_RECHAZADA, HttpStatus.CONFLICT,
+				"Esta reserva fue rechazada por no pagar el saldo a tiempo.");
+	}
+
 	private static NegocioException noExiste() {
 		return new NegocioException(CodigoError.PAGO_NO_ENCONTRADO, HttpStatus.NOT_FOUND, "El pago ya no existe.");
 	}
@@ -141,8 +166,8 @@ public class RevisionPagoService {
 		// Estado resultante, calculado antes de tocar nada para que un error no deje cambios a medias.
 		List<PagoRegla> resultantes = todos.stream()
 				.map(p -> new PagoRegla(p.getMonto(), p == pago ? nueva : p.getRevision())).toList();
-		boolean activaDespues = EstadoInscripcion
-				.derivar(inscripcion.getTotal(), resultantes, inscripcion.getFechaCompromiso(), hoy).activa();
+		boolean activaDespues = EstadoInscripcion.derivar(inscripcion.getTotal(), resultantes,
+				inscripcion.getFechaCompromiso(), hoy, inscripcion.isRechazada()).activa();
 
 		aprobacion.validar(cfg, inscripcion, personas, todos, nueva == RevisionPago.APROBADO, activaDespues, hoy);
 
