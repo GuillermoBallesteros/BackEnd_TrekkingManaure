@@ -2,6 +2,14 @@
 # y redirige HTTP -> HTTPS automáticamente.
 # Este Caddyfile solo lo usa docker-compose.prod.yml, por eso el HSTS vive aquí y no en la API.
 # Un solo origen: /api/* y /actuator/health van a la API; el resto, al sitio y al panel (web).
+
+# Al redesplegar, api o web tardan unos segundos en volver: Caddy reintenta la conexión en vez
+# de responder 502. Solo reintenta si no alcanzó a conectar, así que no repite una petición enviada.
+(reintento) {
+	lb_try_duration 45s
+	lb_try_interval 250ms
+}
+
 {$DOMAIN} {
 	encode zstd gzip
 
@@ -20,18 +28,24 @@
 	}
 
 	handle /api/* {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			import reintento
+		}
 	}
 
 	handle /actuator/health* {
-		reverse_proxy api:8080
+		reverse_proxy api:8080 {
+			import reintento
+		}
 	}
 
 	# Sitio y panel. La API trae su propia CSP; esta es la del sitio: imágenes de Cloudinary y
 	# banderas de flagcdn, estilos en línea de React (atributo style) y nada más de terceros.
 	handle {
 		header Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https://res.cloudinary.com https://flagcdn.com; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-		reverse_proxy web:8080
+		reverse_proxy web:8080 {
+			import reintento
+		}
 	}
 }
 
