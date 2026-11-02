@@ -45,7 +45,7 @@ final class Datos {
 
 	private static CatalogoReglas catalogos() {
 		Map<String, ReglaDocumento> docs = new LinkedHashMap<>();
-		docs.put("CC", new ReglaDocumento("[1-9][0-9]{7,9}", "Entre 8 y 10 dígitos", 18, null));
+		docs.put("CC", new ReglaDocumento("[1-9][0-9]{5,10}", "Entre 6 y 11 dígitos", 18, null));
 		docs.put("CE", new ReglaDocumento("[0-9]{6,10}", "Entre 6 y 10 dígitos", null, null));
 		docs.put("TI", new ReglaDocumento("[0-9]{10,11}", "10 u 11 dígitos", 7, 18));
 		docs.put("RC", new ReglaDocumento("[0-9]{10}", "10 dígitos", null, 7));

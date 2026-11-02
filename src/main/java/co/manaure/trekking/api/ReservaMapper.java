@@ -106,7 +106,8 @@ public class ReservaMapper {
 				t.participante().getTalla(), acompanante(r.acompanante()), List.copyOf(r.extras()), hotel(r),
 				plan(insc.getPlanPago()),
 				insc.getFechaCompromiso() == null ? null : insc.getFechaCompromiso().toString(),
-				insc.isAutorizacionMenor(), r.pagos().stream().map(ReservaMapper::pago).toList(), insc.getTotal());
+				insc.isAutorizacionMenor(), r.pagos().stream().map(ReservaMapper::pago).toList(), insc.getTotal(),
+				insc.isRechazada());
 	}
 
 	private Companion acompanante(Integrante a) {

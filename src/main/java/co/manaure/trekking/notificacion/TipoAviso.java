@@ -12,7 +12,11 @@ public enum TipoAviso {
 	PAGO_VENCIDO("pago-vencido"),
 	PAGO_APROBADO("pago-aprobado"),
 	PAGO_RECHAZADO("pago-rechazado"),
-	EVENTO_MANANA("evento-manana");
+	EVENTO_MANANA("evento-manana"),
+	/** Acuse al crear la reserva, plazo ampliado (RN-25) y reserva vencida rechazada (RN-26). */
+	RESERVA_RECIBIDA("reserva-recibida"),
+	PLAZO_AMPLIADO("plazo-ampliado"),
+	RESERVA_RECHAZADA("reserva-rechazada");
 
 	private final String clave;
 

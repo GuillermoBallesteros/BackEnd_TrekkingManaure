@@ -24,7 +24,7 @@ import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.MediaType;
 
-/** HU-N08 con PostgreSQL 18 real: revisión de pagos (aprobar, rechazar, devolver a "Por revisar"). */
+/** HU-N08 con PostgreSQL 18 real: revisión de pagos (aprobar, rechazar; la aprobación es definitiva, RN-14). */
 class RevisionPagoTest extends ReservaPublicaBase {
 
 	private static final String RUTA = "/api/v1/admin/pagos/PAG-0001/revision";
@@ -146,33 +146,37 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void devolverUnPagoAprobadoAPorRevisarBorraRevisorYConservaLosCupos() throws Exception {
+	void unPagoAprobadoEsDefinitivoNoSeRechazaNiVuelveAPorRevisar() throws Exception {
 		crearTitular();
 		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
-		assertThat(cuposParamo()).isEqualTo(1);
-		assertThat(pago("PAG-0001").get("revisado_por")).isEqualTo(adminId());
-		assertThat(pago("PAG-0001").get("revisado_en")).isNotNull();
+		Object revisadoEn = pago("PAG-0001").get("revisado_en");
 
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk())
-				.andExpect(jsonPath("$.payments[0].review").value("Por revisar"))
-				.andExpect(jsonPath("$.payments[0].rejectionReason").value(nullValue()));
-		// La reserva sigue activa: conserva su cupo de la carrera y su cupo del páramo.
-		assertThat(cuposParamo()).isEqualTo(1);
-		assertThat(pago("PAG-0001").get("revisado_por")).isNull();
-		assertThat(pago("PAG-0001").get("revisado_en")).isNull();
+		revisar("PAG-0001", "Rechazado", "Me equivoqué").andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("PAGO_APROBADO_DEFINITIVO"))
+				.andExpect(jsonPath("$.detail").value("Este pago ya está aprobado y la aprobación es definitiva."));
+		revisar("PAG-0001", "Por revisar", null).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("PAGO_APROBADO_DEFINITIVO"));
+
+		assertThat(pago("PAG-0001").get("revision")).isEqualTo("APROBADO");
+		assertThat(pago("PAG-0001").get("revisado_por")).isEqualTo(adminId());
+		assertThat(pago("PAG-0001").get("revisado_en")).isEqualTo(revisadoEn);
 		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(true);
+		assertThat(cuposParamo()).isEqualTo(1);
+		assertThat(jdbc.queryForObject("select count(*) from auditoria where entidad = 'PAGO'", Integer.class))
+				.isEqualTo(1);
 	}
 
 	@Test
-	void devolverUnPagoRechazadoAPorRevisarBorraElMotivoYReactivaLaReserva() throws Exception {
+	void unPagoRechazadoNoVuelveAPorRevisar() throws Exception {
 		crear(ReservaJson.conAcompanante());
 		revisar("PAG-0001", "Rechazado", "No aparece").andExpect(status().isOk());
 
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk())
-				.andExpect(jsonPath("$.payments[0].rejectionReason").value(nullValue()));
-		assertThat(pago("PAG-0001").get("motivo_rechazo")).isNull();
-		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(true);
-		assertThat(documentosActivos("PER-0001")).hasSize(2);
+		revisar("PAG-0001", "Por revisar", null).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("REVISION_NO_PERMITIDA"))
+				.andExpect(jsonPath("$.detail").value("Un pago ya revisado no vuelve a quedar por revisar."));
+		assertThat(pago("PAG-0001").get("motivo_rechazo")).isEqualTo("No aparece");
+		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(false);
+		assertThat(documentosActivos("PER-0001")).isEmpty();
 	}
 
 	@Test
@@ -202,18 +206,16 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	@Test
 	void cadaTransicionSeAuditaConCodigoYTransicionSinElTextoDelMotivo() throws Exception {
 		crearTitular();
-		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk());
 		revisar("PAG-0001", "Rechazado", "Motivo secreto del rechazo").andExpect(status().isOk());
+		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
 
 		List<Map<String, Object>> filas = jdbc.queryForList("""
 				select accion, entidad, entidad_ref, detalle, administrador_id from auditoria
 				where entidad = 'PAGO' order by id""");
-		assertThat(filas).extracting(f -> f.get("accion")).containsExactly("APROBAR_PAGO",
-				"DEVOLVER_PAGO_A_REVISION", "RECHAZAR_PAGO");
+		assertThat(filas).extracting(f -> f.get("accion")).containsExactly("RECHAZAR_PAGO", "APROBAR_PAGO");
 		assertThat(filas).extracting(f -> f.get("entidad_ref")).containsOnly("PAG-0001");
-		assertThat(filas).extracting(f -> f.get("detalle")).containsExactly("POR_REVISAR>APROBADO",
-				"APROBADO>POR_REVISAR", "POR_REVISAR>RECHAZADO");
+		assertThat(filas).extracting(f -> f.get("detalle")).containsExactly("POR_REVISAR>RECHAZADO",
+				"RECHAZADO>APROBADO");
 		assertThat(filas).extracting(f -> f.get("administrador_id")).containsOnly(adminId());
 		assertThat(filas.toString()).doesNotContain("secreto").doesNotContain("1065123456").doesNotContain("Ana");
 	}
@@ -278,7 +280,7 @@ class RevisionPagoTest extends ReservaPublicaBase {
 		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
 		crear(ReservaJson.titular().set("document", "1065000111"));
 
-		for (String review : List.of("Aprobado", "Por revisar")) {
+		for (String review : List.of("Aprobado")) {
 			revisar("PAG-0001", review, null).andExpect(status().isConflict())
 					.andExpect(jsonPath("$.code").value("SIN_CUPO_PARA_APROBAR"))
 					.andExpect(jsonPath("$.detail").value("No hay cupos en el páramo para reactivar esta inscripción "
@@ -324,7 +326,7 @@ class RevisionPagoTest extends ReservaPublicaBase {
 		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
 		enviar(ReservaJson.titular()).andExpect(status().isCreated());
 
-		for (String review : List.of("Por revisar", "Aprobado")) {
+		for (String review : List.of("Aprobado")) {
 			revisar("PAG-0001", review, null).andExpect(status().isConflict())
 					.andExpect(jsonPath("$.code").value("DOCUMENTO_DUPLICADO"))
 					// Audiencia administrador: sin el aviso "Si no fuiste tú".
@@ -336,19 +338,16 @@ class RevisionPagoTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void rechazarODevolverUnaReservaActivaNuncaSeBloqueaPorMenorNiPorCupo() throws Exception {
+	void rechazarNuncaSeBloqueaPorMenorNiPorCupo() throws Exception {
 		crear(menor());
 		revisar("PAG-0001", "Rechazado", "x").andExpect(status().isOk());
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk());
 
-		// Reserva de 2 personas ya aprobada; el páramo se reduce y devolverla o rechazarla sigue permitido.
+		// Reserva de 2 personas por revisar; el páramo se reduce y rechazarla sigue permitido.
 		crear(otra("1065000222", "1065000333"));
-		aprobarPagos("PER-0002");
 		jdbc.update("update configuracion_evento set cupos_paramo = 1");
-		revisar("PAG-0002", "Por revisar", null).andExpect(status().isOk());
 		revisar("PAG-0002", "Rechazado", "x").andExpect(status().isOk());
 		// Rechazada ya liberó sus cupos: reactivarla exige que vuelvan a caber.
-		revisar("PAG-0002", "Por revisar", null).andExpect(status().isConflict())
+		revisar("PAG-0002", "Aprobado", null).andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("SIN_CUPO_PARA_APROBAR"));
 	}
 
@@ -408,13 +407,14 @@ class RevisionPagoTest extends ReservaPublicaBase {
 		adminId();
 
 		List<Integer> estados = enParalelo(List.of(() -> estado("PAG-0001", "Rechazado", "No aparece"),
-				() -> estado("PAG-0001", "Aprobado", null), () -> estado("PAG-0001", "Por revisar", null)));
+				() -> estado("PAG-0001", "Aprobado", null)));
 
-		assertThat(estados).containsOnly(200);
-		boolean rechazado = "RECHAZADO".equals(pago("PAG-0001").get("revision"));
-		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(!rechazado);
-		assertThat(documentosActivos("PER-0001")).hasSize(rechazado ? 0 : 2);
-		assertThat(pago("PAG-0001").get("motivo_rechazo") != null).isEqualTo(rechazado);
+		// Si gana el rechazo, aprobar después reactiva (200); si gana la aprobación, es definitiva (409).
+		assertThat(estados).contains(200).containsAnyOf(200, 409);
+		assertThat(pago("PAG-0001").get("revision")).isEqualTo("APROBADO");
+		assertThat(pago("PAG-0001").get("motivo_rechazo")).isNull();
+		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(true);
+		assertThat(documentosActivos("PER-0001")).hasSize(2);
 	}
 
 }

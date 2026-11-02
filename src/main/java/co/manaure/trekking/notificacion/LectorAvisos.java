@@ -61,11 +61,16 @@ public class LectorAvisos {
 		return pagos.codigoInscripcionDe(codigoPago).flatMap(inscripciones::findByCodigo).map(i -> contexto(i, hoy));
 	}
 
+	@Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW)
+	public Optional<ContextoAviso> porReserva(String codigoReserva, LocalDate hoy) {
+		return inscripciones.findByCodigo(codigoReserva).map(i -> contexto(i, hoy));
+	}
+
 	private ContextoAviso contexto(Inscripcion inscripcion, LocalDate hoy) {
 		List<Pago> todos = pagos.findByInscripcionIdOrderByIdAsc(inscripcion.getId());
 		List<PagoRegla> reglas = todos.stream().map(p -> new PagoRegla(p.getMonto(), p.getRevision())).toList();
 		EstadoInscripcion estado = EstadoInscripcion.derivar(inscripcion.getTotal(), reglas,
-				inscripcion.getFechaCompromiso(), hoy);
+				inscripcion.getFechaCompromiso(), hoy, inscripcion.isRechazada());
 
 		Map<RolParticipante, PersonaAviso> personas = new EnumMap<>(RolParticipante.class);
 		for (InscripcionParticipante ip : participantes.porInscripciones(List.of(inscripcion.getId()))) {

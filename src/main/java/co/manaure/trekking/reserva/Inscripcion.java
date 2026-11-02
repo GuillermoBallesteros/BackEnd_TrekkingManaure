@@ -72,6 +72,10 @@ public class Inscripcion {
 	@Column(name = "creado_en", insertable = false, updatable = false)
 	private OffsetDateTime creadoEn;
 
+	/** Momento en que la encargada rechazó la reserva vencida (RN-26); null si no se rechazó. */
+	@Column(name = "rechazada_en")
+	private OffsetDateTime rechazadaEn;
+
 	protected Inscripcion() {
 	}
 
@@ -97,6 +101,12 @@ public class Inscripcion {
 	public void setActiva(boolean activa) { this.activa = activa; }
 	public void setAutorizacionMenor(boolean autorizacionMenor) { this.autorizacionMenor = autorizacionMenor; }
 
+	/** RN-25: nueva fecha compromiso de una reserva vencida. */
+	public void ampliarPlazo(LocalDate nuevaFecha) { this.fechaCompromiso = nuevaFecha; }
+
+	/** RN-26: la reserva vencida queda rechazada aunque conserve pagos aprobados. */
+	public void rechazar(OffsetDateTime ahora) { this.rechazadaEn = ahora; }
+
 	public Long getId() { return id; }
 	public String getCodigo() { return codigo; }
 	public PlanPago getPlanPago() { return planPago; }
@@ -113,5 +123,7 @@ public class Inscripcion {
 	public long getTotal() { return total; }
 	public LocalDate getFechaRegistro() { return fechaRegistro; }
 	public OffsetDateTime getCreadoEn() { return creadoEn; }
+	public OffsetDateTime getRechazadaEn() { return rechazadaEn; }
+	public boolean isRechazada() { return rechazadaEn != null; }
 
 }

@@ -113,7 +113,7 @@ Los precios >= 0 por CHECK. Solo el panel cambia `cupos_carrera`, `cupos_paramo`
 | id | BIGINT IDENTITY PK | |
 | nombres, apellidos | VARCHAR(60) NOT NULL | (V18) CHECK longitud 2 a 40 y `~ '^[A-ZÑ]+([ ''-][A-ZÑ]+)*$'` (MAYÚSCULAS, sin tildes salvo la Ñ) |
 | tipo_documento | VARCHAR(20) NOT NULL | FK tipo_documento |
-| documento | VARCHAR(20) NOT NULL | CHECK `~ '^[A-Z0-9]{5,20}$'` y (V18) CHECK por tipo: CC `^[1-9][0-9]{7,9}$`, TI `^[0-9]{10,11}$`, RC `^[0-9]{10}$`, CE `^[0-9]{6,10}$`, PPT `^[0-9]{5,8}$`, Pasaporte `^[A-Z0-9]{6,12}$`; guardado sin separadores y en mayúsculas; índice (no único) |
+| documento | VARCHAR(20) NOT NULL | CHECK `~ '^[A-Z0-9]{5,20}$'` y (V18) CHECK por tipo: CC `^[1-9][0-9]{5,10}$` (V22; en V18 era `{7,9}`), TI `^[0-9]{10,11}$`, RC `^[0-9]{10}$`, CE `^[0-9]{6,10}$`, PPT `^[0-9]{5,8}$`, Pasaporte `^[A-Z0-9]{6,12}$`; guardado sin separadores y en mayúsculas; índice (no único) |
 | fecha_nacimiento | DATE NOT NULL | |
 | genero | VARCHAR(30) NOT NULL | FK genero |
 | telefono_pais | CHAR(2) NOT NULL | FK pais_telefono |

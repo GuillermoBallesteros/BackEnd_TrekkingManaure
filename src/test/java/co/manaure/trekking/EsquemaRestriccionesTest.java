@@ -91,7 +91,7 @@ class EsquemaRestriccionesTest {
 	void tiposDocumentoSembradosConPatronYEdades() {
 		assertThat(jdbc.queryForObject("select count(*) from tipo_documento", Integer.class)).isEqualTo(6);
 		Map<String, Object> cc = jdbc.queryForMap("select * from tipo_documento where clave = 'CC'");
-		assertThat(cc).containsEntry("patron", "[1-9][0-9]{7,9}").containsEntry("ayuda", "Entre 8 y 10 dígitos");
+		assertThat(cc).containsEntry("patron", "[1-9][0-9]{5,10}").containsEntry("ayuda", "Entre 6 y 11 dígitos");
 		assertThat(num(cc, "edad_min")).isEqualTo(18);
 		assertThat(cc.get("edad_max")).isNull();
 		Map<String, Object> ti = jdbc.queryForMap("select * from tipo_documento where clave = 'TI'");
@@ -230,14 +230,14 @@ class EsquemaRestriccionesTest {
 	}
 
 	@ParameterizedTest
-	@CsvSource({ "CC,54876234", "CC,1098726541", "CC,123456789", "TI,1234567890", "TI,12345678901", "RC,1234567890",
+	@CsvSource({ "CC,54876234", "CC,1098726541", "CC,123456789", "CC,123456", "CC,12345678901", "TI,1234567890", "TI,12345678901", "RC,1234567890",
 			"CE,123456", "CE,1234567890", "PPT,12345", "PPT,12345678", "Pasaporte,AB1234", "Pasaporte,AB1234567890" })
 	void documentosValidosSegunElTipo(String tipo, String documento) {
 		insertarPersonaCon("MARIA", "PEREZ", tipo, documento, "maria@example.com", "Valledupar", "Nueva EPS", null);
 	}
 
 	@ParameterizedTest
-	@CsvSource({ "CC,1234567", "CC,12345678901", "CC,0123456789", "CC,12AB567890", "TI,123456789", "TI,123456789012",
+	@CsvSource({ "CC,12345", "CC,123456789012", "CC,0123456789", "CC,12AB567890", "TI,123456789", "TI,123456789012",
 			"RC,123456789", "RC,12345678901", "CE,12345", "CE,12345678901", "PPT,123456789", "PPT,AB12345",
 			"Pasaporte,AB123", "Pasaporte,AB12345678901" })
 	void documentosInvalidosSegunElTipoSeRechazan(String tipo, String documento) {

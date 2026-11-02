@@ -120,18 +120,13 @@ class CaducidadReservasTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void unPagoDevueltoAPorRevisarHoyNoSeRechazaAunqueLaReservaSeaDeHaceDias() throws Exception {
+	void unPagoRechazadoAutomaticamenteNoVuelveAPorRevisar() throws Exception {
 		enviar(ReservaJson.titular()).andExpect(status().isCreated());
-		revisar("PAG-0001", "Rechazado", "No aparece").andExpect(status().isOk());
-		avanzar(Duration.ofDays(3));
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk());
+		avanzar(DOCE_HORAS);
+		caducidad.ejecutar();
 
-		assertThat(caducidad.ejecutar()).isZero();
-		avanzar(DOCE_HORAS.minusMinutes(1));
-		assertThat(caducidad.ejecutar()).isZero();
-		assertThat(pago("PAG-0001").get("revision")).isEqualTo("POR_REVISAR");
-		avanzar(Duration.ofMinutes(1));
-		assertThat(caducidad.ejecutar()).isEqualTo(1);
+		revisar("PAG-0001", "Por revisar", null).andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("REVISION_NO_PERMITIDA"));
 		assertThat(pago("PAG-0001").get("revision")).isEqualTo("RECHAZADO");
 	}
 
@@ -152,29 +147,29 @@ class CaducidadReservasTest extends ReservaPublicaBase {
 	}
 
 	@Test
-	void laEncargadaPuedeReabrirElPagoRechazadoAutomaticamenteYLaReservaVuelveAActiva() throws Exception {
+	void laEncargadaPuedeAprobarElPagoRechazadoAutomaticamenteYLaReservaVuelveAActiva() throws Exception {
 		enviar(ReservaJson.conAcompanante()).andExpect(status().isCreated());
 		avanzar(DOCE_HORAS);
 		caducidad.ejecutar();
 		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(false);
 
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isOk());
-		assertThat(pago("PAG-0001").get("revision")).isEqualTo("POR_REVISAR");
+		revisar("PAG-0001", "Aprobado", null).andExpect(status().isOk());
+		assertThat(pago("PAG-0001").get("revision")).isEqualTo("APROBADO");
 		assertThat(pago("PAG-0001").get("motivo_rechazo")).isNull();
 		assertThat(inscripcion("PER-0001").get("activa")).isEqualTo(true);
 		assertThat(documentosActivos("PER-0001")).isEqualTo(2);
-		// Recién reabierto: no se vuelve a rechazar.
+		// Con un pago aprobado ya no caduca.
 		assertThat(caducidad.ejecutar()).isZero();
 	}
 
 	@Test
-	void siOtraInscripcionTomoElDocumentoReabrirDa409() throws Exception {
+	void siOtraInscripcionTomoElDocumentoAprobarElPagoCaducadoDa409() throws Exception {
 		enviar(ReservaJson.titular()).andExpect(status().isCreated());
 		avanzar(DOCE_HORAS);
 		caducidad.ejecutar();
 		enviar(ReservaJson.titular()).andExpect(status().isCreated());
 
-		revisar("PAG-0001", "Por revisar", null).andExpect(status().isConflict())
+		revisar("PAG-0001", "Aprobado", null).andExpect(status().isConflict())
 				.andExpect(jsonPath("$.code").value("DOCUMENTO_DUPLICADO"));
 		assertThat(pago("PAG-0001").get("revision")).isEqualTo("RECHAZADO");
 	}

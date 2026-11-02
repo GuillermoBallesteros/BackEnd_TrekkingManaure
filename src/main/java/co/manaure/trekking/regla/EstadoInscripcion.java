@@ -46,6 +46,15 @@ public enum EstadoInscripcion {
 	 */
 	public static EstadoInscripcion derivar(long total, List<PagoRegla> pagos, LocalDate fechaCompromiso,
 			LocalDate hoy) {
+		return derivar(total, pagos, fechaCompromiso, hoy, false);
+	}
+
+	/** Como {@link #derivar(long, List, LocalDate, LocalDate)}; una reserva vencida rechazada (RN-26) es Rechazado. */
+	public static EstadoInscripcion derivar(long total, List<PagoRegla> pagos, LocalDate fechaCompromiso,
+			LocalDate hoy, boolean rechazada) {
+		if (rechazada) {
+			return RECHAZADO;
+		}
 		long pagado = pagado(pagos);
 		if (pagado > 0 && pagado >= total) {
 			return PAGADO;

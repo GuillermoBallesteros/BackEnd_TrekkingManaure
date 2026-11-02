@@ -96,4 +96,13 @@ class EstadoInscripcionTest {
 				.containsExactly("Por verificar", "Saldo pendiente", "Vencido", "Pagado", "Rechazado");
 	}
 
+	@Test
+	void unaReservaVencidaRechazadaEsRechazadoAunqueTengaPagosAprobados() {
+		List<PagoRegla> pagos = List.of(p(50_000, APROBADO));
+		assertThat(EstadoInscripcion.derivar(TOTAL, pagos, HOY.minusDays(1), HOY, true))
+				.isEqualTo(EstadoInscripcion.RECHAZADO);
+		assertThat(EstadoInscripcion.derivar(TOTAL, pagos, HOY.minusDays(1), HOY, false))
+				.isEqualTo(EstadoInscripcion.VENCIDO);
+	}
+
 }
