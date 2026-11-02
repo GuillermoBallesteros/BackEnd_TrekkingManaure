@@ -94,14 +94,14 @@ La hora de aceptación (`acceptedAt`) definitiva la pone el servidor al registra
 ### 5.1 Documentos por tipo
 | Tipo | Formato | Edad |
 |---|---|---|
-| CC | 8 a 10 dígitos, no empieza por 0 | 18 años o más |
+| CC | 6 a 11 dígitos, no empieza por 0 | 18 años o más |
 | CE | 6 a 10 dígitos | sin límite |
 | TI | 10 u 11 dígitos | 7 a 18 años |
 | RC | 10 dígitos | hasta 7 años |
 | Pasaporte | 6 a 12 letras o números | sin límite |
 | PPT | 5 a 8 dígitos | sin límite |
 
-Todos los tipos son numéricos salvo el pasaporte. La CC de 8 a 10 dígitos la fijó el cliente (cubre 54876234 y 1098726541); los rangos de CE, RC, PPT y pasaporte y las edades están "por confirmar con el cliente" [SUPUESTO]. La edad se calcula a la fecha de hoy (Bogotá).
+Todos los tipos son numéricos salvo el pasaporte. La CC de 6 a 11 dígitos amplía el margen original de 8 a 10 (cubre 54876234 y 1098726541); los rangos de CE, RC, PPT y pasaporte y las edades están "por confirmar con el cliente" [SUPUESTO]. La edad se calcula a la fecha de hoy (Bogotá).
 
 ### 5.2 Teléfonos por país (13 países) [CONFIRMADO]
 Número nacional sin indicativo, solo dígitos. `largos` = cantidad de dígitos; `inicios` = prefijos permitidos. Móvil siempre; fijo solo para el contacto de emergencia.
